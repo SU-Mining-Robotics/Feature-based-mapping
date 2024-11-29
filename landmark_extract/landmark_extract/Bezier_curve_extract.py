@@ -7,8 +7,10 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import time
-from Bezierfit import BezierCurveFitter
-from BSplinefit import BSplineFitter
+# from Bezierfit import BezierCurveFitter
+from Bezierfit_V2 import BezierCurveFitter
+# from BSplinefit import BSplineFitter
+from BSpline_V2 import BSplineFitter
 from scipy.interpolate import interpolate
   
 class myNode(Node):
@@ -44,12 +46,19 @@ class myNode(Node):
 		# # bezier_fitter.visualize()
 		# bezier_fitter.visualize_continues()
 
+		# bezier_fitter = BezierCurveFitter(scan_segments, segment_length=3)
+		# bezier_curves, control_points, centroids = bezier_fitter.fit_all_segments()
+		# # bezier_fitter.visualize()
+		# bezier_fitter.visualize_continues()
+
+		# bspline_fitter = BSplineFitter(scan_segments)
+		# bspline_curves, knot_points, control_points,centroids = bspline_fitter.fit_all_segments(0.05)
+		# ## bspline_fitter.visualize()
+		# bspline_fitter.visualize_continues()
+  
 		bspline_fitter = BSplineFitter(scan_segments)
-		bspline_curves, knot_points, control_points,centroids = bspline_fitter.fit_all_segments(0.05)
-		## bspline_fitter.visualize()
+		bspline_curves, knot_points_list, control_points_list, centroids_list = bspline_fitter.fit_all_segments(knot_distance=0.5)
 		bspline_fitter.visualize_continues()
-
-
 
 		# # Log the number of segments and their lengths
 		# self.get_logger().info(f'Excution time: {excution_time}')

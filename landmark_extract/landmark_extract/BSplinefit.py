@@ -169,12 +169,11 @@ def main():
         np.array([[4, 0], [4.5, 0.5], [5, 1], [5.5, 1.5], [6, 2]])  # Example curved segment
     ]
 
-    # bspline_fitter = BSplineFitter(lidar_segments)
-    # bspline_curves, control_points, centroids = bspline_fitter.fit_all_segments()
-    # bspline_fitter.visualize()
-    
     bspline_fitter = BSplineFitter(lidar_segments)
-    bspline_fitter.plot_live(interval=1.0)  # Update every 1 second
+    bspline_curves, knot_points_list, control_points_list, centroids_list = bspline_fitter.fit_all_segments()
+    bspline_fitter.visualize()
+    
+  
 
 if __name__ == "__main__":
     main()

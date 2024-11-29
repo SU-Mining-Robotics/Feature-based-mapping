@@ -18,6 +18,7 @@ t_data[0] = 0
 for i in range(1, len(x_data)):
     t_data[i] = t_data[i-1] + np.abs(x_data[i] - x_data[i-1])
 
+
 # Step 3: Construct the collocation matrix B
 # We will use the basis functions from the scipy CubicSpline, but normally we'd compute these manually.
 # The basis functions in this case are the piecewise cubic functions that define the spline.

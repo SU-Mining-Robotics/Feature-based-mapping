@@ -2,13 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
+
 class BezierCurveFitter:
-    def __init__(self, lidar_segments):
+    def __init__(self, lidar_segments, segment_length=None):
         """
         Initialize the BezierCurveFitter with a list of lidar segments.
         Each segment should be a list of points (numpy arrays of shape (N, 2)).
+        If segment_length is specified, lidar segments will be subdivided accordingly.
         """
-        self.lidar_segments = lidar_segments
+        self.original_segments = lidar_segments
+        self.segment_length = segment_length
+        self.lidar_segments = self.subdivide_segments() if segment_length else lidar_segments
         self.bezier_curves = []
         self.control_points = []
         self.centroids = []
@@ -27,6 +31,20 @@ class BezierCurveFitter:
         bezier = BezierCurveFitter.cubic_bezier(p0, p1, p2, p3, num_points=len(lidar_points))
         loss = np.sum(np.linalg.norm(bezier - lidar_points, axis=1)**2)
         return loss
+
+    def subdivide_segments(self):
+        """Subdivide lidar segments into smaller segments of specified length."""
+        subdivided_segments = []
+        for segment in self.original_segments:
+            distances = np.sqrt(np.sum(np.diff(segment, axis=0)**2, axis=1))
+            cumulative_distance = np.cumsum(distances)
+            start_idx = 0
+            while start_idx < len(segment) - 1:
+                end_idx = np.searchsorted(cumulative_distance, cumulative_distance[start_idx] + self.segment_length)
+                end_idx = min(end_idx, len(segment) - 1)  # Ensure index doesn't exceed segment length
+                subdivided_segments.append(segment[start_idx:end_idx + 1])
+                start_idx = end_idx
+        return subdivided_segments
 
     def fit_bezier_to_lidar(self, lidar_segment):
         """Fit a Bezier curve to a lidar segment."""
@@ -91,9 +109,9 @@ class BezierCurveFitter:
         plt.ylabel('Y')
         plt.axis('equal')
         plt.show()
-        
+
     def visualize_continues(self):
-        """Visualize lidar segments, fitted Bezier curves, control points, and centroids."""
+        """Continuously visualize lidar segments, fitted Bezier curves, control points, and centroids."""
         plt.clf()
         for i, (lidar_segment) in enumerate(self.lidar_segments):
             bezier_curve = self.bezier_curves[i]
@@ -122,6 +140,7 @@ class BezierCurveFitter:
         plt.draw()
         plt.pause(0.01)  # Pause to update the plot
 
+
 # Example usage
 def main():
     lidar_segments = [
@@ -129,9 +148,10 @@ def main():
         np.array([[4, 0], [5, 0.5], [5.5, 1], [5.9, 1.5], [6, 2]])  # Example curved segment
     ]
 
-    bezier_fitter = BezierCurveFitter(lidar_segments)
+    bezier_fitter = BezierCurveFitter(lidar_segments, segment_length=2)
     bezier_curves, control_points, centroids = bezier_fitter.fit_all_segments()
     bezier_fitter.visualize()
+
 
 if __name__ == "__main__":
     main()
