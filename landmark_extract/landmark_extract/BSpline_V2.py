@@ -157,16 +157,16 @@ class BSplineFitter:
                 centroid = self.centroids[i]
 
                 # Plot lidar segment points with transparency (background layer)
-                # plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.7, label=f'Segment {i+1} Points')
+                plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.7, label=f'Segment {i+1} Points')
 
-                # Plot B-spline curve (foreground layer)
-                plt.plot(bspline_curve[:, 0], bspline_curve[:, 1], '-', linewidth=2, label=f'B-spline Segment {i+1}')
+                # # Plot B-spline curve (foreground layer)
+                # plt.plot(bspline_curve[:, 0], bspline_curve[:, 1], '-', linewidth=2, label=f'B-spline Segment {i+1}')
 
                 # Plot knot points (foreground layer)
                 plt.plot(knot_points[:, 0], knot_points[:, 1], 'rx-', markersize=8, label=f'Knot Points {i+1}')
 
                 # Plot control points (foreground layer)
-                # plt.plot(control_points[:, 0], control_points[:, 1], 'kx-', markersize=8, label=f'Control Points {i+1}')
+                plt.plot(control_points[:, 0], control_points[:, 1], 'kx-', markersize=8, label=f'Control Points {i+1}')
 
                 # Plot centroid of control points (foreground layer)
                 # plt.plot(centroid[0], centroid[1], 'r*', markersize=10, label=f'Centroid {i+1}')

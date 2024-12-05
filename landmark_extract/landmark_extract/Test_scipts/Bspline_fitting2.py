@@ -5,7 +5,7 @@ from scipy.interpolate import CubicSpline
 # Step 1: Generate noisy data points
 # Let's create a smooth sine wave and add some Gaussian noise to it
 np.random.seed(0)  # For reproducibility
-x_data = np.linspace(0, 10, 20)
+x_data = np.linspace(0, 10, 10)
 y_data = np.sin(x_data) + np.random.normal(0, 0.1, len(x_data))  # Sine wave with noise
 
 # Step 2: Define the cubic spline basis functions

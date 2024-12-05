@@ -1,7 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import numpy as np
-import matplotlib.pyplot as plt
 from scipy.interpolate import BSpline
 from scipy import interpolate
 
