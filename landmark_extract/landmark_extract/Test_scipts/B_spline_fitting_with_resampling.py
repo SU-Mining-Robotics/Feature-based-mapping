@@ -96,7 +96,6 @@ resampled_points, smooth_line, line_lenght, resampled_lenght , re_tck = resample
 # Calculate and print the total length of the curve
 total_length = spline_fitter.calculate_curve_length()
 print("Total length of the curve:", total_length)
-
 print("Line Length:", line_lenght)
 print("Resampled Line Length:", resampled_lenght)
 

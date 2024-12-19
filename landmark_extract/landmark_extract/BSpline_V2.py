@@ -141,6 +141,8 @@ class BSplineFitter:
             len(self.control_points),
             len(self.centroids),
         )
+        # for i in range(len(self.lidar_segments)):
+        #     plt.plot(self.lidar_segments[i][:, 0], self.lidar_segments[i][:, 1], 'o', markersize=5, alpha=0.7, label=f'Segment {i+1} Points')
 
         # Check if there is any valid data to plot
         if min_length == 0:
@@ -187,6 +189,8 @@ class BSplineFitter:
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.axis('equal')
+        plt.xlim(-20, 20)
+        plt.ylim(-20, 20)
         plt.draw()
         plt.pause(0.01)  # Pause to update the plot
 

@@ -11,6 +11,7 @@ k = 3  # Degree of the spline
 # Standard uniform knots
 t_uniform = np.linspace(x[0], x[-1], len(x) + k + 1)  # Knot vector
 c = y  # Coefficients (control points)
+print("Control points:\n", c)
 
 # Clamped (open uniform) knot vector
 n = len(x)  # Number of control points

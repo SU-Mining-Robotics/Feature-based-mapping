@@ -17,6 +17,7 @@ class myNode(Node):
 	def __init__(self):
 		super().__init__("Bezier_curve_extract")  
 		self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10)
+		# self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10)
 
 		self.alpha_max = np.pi / 4  # Angular threshold
 		self.eta = 2 # Length threshold	
@@ -46,19 +47,19 @@ class myNode(Node):
 		# # bezier_fitter.visualize()
 		# bezier_fitter.visualize_continues()
 
-		bezier_fitter = BezierCurveFitter(scan_segments, segment_length=1)
-		bezier_curves, control_points, centroids = bezier_fitter.fit_all_segments()
-		# bezier_fitter.visualize()
-		bezier_fitter.visualize_continues()
+		# bezier_fitter = BezierCurveFitter(scan_segments, segment_length=2)
+		# bezier_curves, control_points, centroids = bezier_fitter.fit_all_segments()
+		# # bezier_fitter.visualize()
+		# bezier_fitter.visualize_continues()
 
 		# bspline_fitter = BSplineFitter(scan_segments)
 		# bspline_curves, knot_points, control_points,centroids = bspline_fitter.fit_all_segments(0.5)
 		# ## bspline_fitter.visualize()
 		# bspline_fitter.visualize_continues()
   
-		# bspline_fitter = BSplineFitter(scan_segments)
-		# bspline_curves, knot_points_list, control_points_list, centroids_list = bspline_fitter.fit_all_segments(knot_distance=0.5)
-		# bspline_fitter.visualize_continues()
+		bspline_fitter = BSplineFitter(scan_segments)
+		bspline_curves, knot_points_list, control_points_list, centroids_list = bspline_fitter.fit_all_segments(knot_distance=0.5)
+		bspline_fitter.visualize_continues()
 
 		# # Log the number of segments and their lengths
 		# self.get_logger().info(f'Excution time: {excution_time}')

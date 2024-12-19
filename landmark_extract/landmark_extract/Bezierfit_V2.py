@@ -119,17 +119,17 @@ class BezierCurveFitter:
             centroid = self.centroids[i]
 
             # Plot lidar segment points
-            plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, label=f'Segment {i+1} Points')
+            plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.4, label=f'Segment {i+1} Points')
 
-            # # Plot Bezier curve
-            # plt.plot(bezier_curve[:, 0], bezier_curve[:, 1], '-', linewidth=2, label=f'Bezier Segment {i+1}')
+            # Plot Bezier curve
+            plt.plot(bezier_curve[:, 0], bezier_curve[:, 1], '-', linewidth=2, label=f'Bezier Segment {i+1}')
 
-            # # Plot control points
-            # control_points_array = np.array(control_points)
-            # plt.plot(control_points_array[:, 0], control_points_array[:, 1], 'kx-', markersize=8, label=f'Control Points {i+1}')
+            # Plot control points
+            control_points_array = np.array(control_points)
+            plt.plot(control_points_array[:, 0], control_points_array[:, 1], 'kx-', markersize=8, label=f'Control Points {i+1}')
 
-            # # Plot centroid of control points
-            # plt.plot(centroid[0], centroid[1], 'r*', markersize=10, label=f'Centroid {i+1}')
+            # Plot centroid of control points
+            plt.plot(centroid[0], centroid[1], 'r*', markersize=10, label=f'Centroid {i+1}')
              
         # Plot an arrow at the origin
         plt.arrow(0, 0, 0.3, 0, head_width=0.15, head_length=0.3, fc='k', ec='k')

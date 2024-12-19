@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Load the CSV data
-data = np.loadtxt('/home/ruan/dev_ws/src/landmark_extract/GT_vs_Odom_vs_Est.csv', delimiter=',', skiprows=1)
+data = np.loadtxt('/home/ruan/dev_ws/src/landmark_extract/Datalogging_scripts/GT_vs_Odom_vs_Est.csv', delimiter=',', skiprows=1)
 
 # Extract ground truth and odometry data
 gt_x = data[:, 2]  # True X coordinates (ground truth)
