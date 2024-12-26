@@ -6,16 +6,19 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 
 class BSplineFitter:
-    def __init__(self, lidar_segments):
+    def __init__(self):
         """
         Initialize the BSplineFitter with a list of lidar segments.
         Each segment should be a list of points (numpy arrays of shape (N, 2)).
         """
-        self.lidar_segments = lidar_segments
+        self.lidar_segments = []
         self.bspline_curves = []
         self.knot_points = []
         self.control_points = []
         self.centroids = []
+        
+    def feed_lidar_segments(self, lidar_segments):
+        self.lidar_segments = lidar_segments
 
 
     def fit_bspline_to_lidar(self, lidar_segment, knot_distance=1.0, smoothness=0):
@@ -36,7 +39,7 @@ class BSplineFitter:
         num_points = len(interp_x)
         if num_points < 2:
             logging.warning(f"Skipping segment: not enough points ({num_points}) to fit a B-spline.")
-            return None, None, None, None
+            return None, None, None, None, None
 
         
         spline_degree = max(1, min(3, num_points - 1))  # Ensure 1 <= k <= 3
@@ -58,7 +61,7 @@ class BSplineFitter:
         # Compute the centroid of the control points
         centroid = np.mean(control_points, axis=0)
 
-        return bspline_curve, knot_points, control_points, centroid
+        return bspline_curve, knot_points, control_points, centroid, tck
 
 
 
@@ -73,9 +76,10 @@ class BSplineFitter:
         knot_points_list = []
         control_points_list = []
         centroids_list = []
+        tck_list = []
 
         for segment in self.lidar_segments:
-            bspline_curve, knot_points, control_points, centroid = self.fit_bspline_to_lidar(
+            bspline_curve, knot_points, control_points, centroid, tck = self.fit_bspline_to_lidar(
                 segment, knot_distance, smoothness
             )
             
@@ -90,8 +94,9 @@ class BSplineFitter:
                 knot_points_list.append(knot_points)
                 control_points_list.append(control_points)
                 centroids_list.append(centroid)
+                tck_list.append(tck)
 
-        return bspline_curves, knot_points_list, control_points_list, centroids_list
+        return bspline_curves, knot_points_list, control_points_list, centroids_list, tck_list
 
     def visualize(self):
         """Visualize lidar segments, fitted B-spline curves, control points, and centroids."""
@@ -104,7 +109,7 @@ class BSplineFitter:
             centroid = self.centroids[i]
 
             # Plot lidar segment points with transparency
-            plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.5, label=f'Segment {i+1} Points')
+            # plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.5, label=f'Segment {i+1} Points')
 
             # Plot B-spline curve
             plt.plot(bspline_curve[:, 0], bspline_curve[:, 1], '-', linewidth=2, label=f'B-spline Segment {i+1}')
@@ -159,10 +164,10 @@ class BSplineFitter:
                 centroid = self.centroids[i]
 
                 # Plot lidar segment points with transparency (background layer)
-                plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.7, label=f'Segment {i+1} Points')
+                # plt.plot(lidar_segment[:, 0], lidar_segment[:, 1], 'o', markersize=5, alpha=0.7, label=f'Segment {i+1} Points')
 
                 # # Plot B-spline curve (foreground layer)
-                # plt.plot(bspline_curve[:, 0], bspline_curve[:, 1], '-', linewidth=2, label=f'B-spline Segment {i+1}')
+                plt.plot(bspline_curve[:, 0], bspline_curve[:, 1], '-', linewidth=2, label=f'B-spline Segment {i+1}')
 
                 # Plot knot points (foreground layer)
                 plt.plot(knot_points[:, 0], knot_points[:, 1], 'rx-', markersize=8, label=f'Knot Points {i+1}')
@@ -189,8 +194,8 @@ class BSplineFitter:
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.axis('equal')
-        plt.xlim(-20, 20)
-        plt.ylim(-20, 20)
+        # plt.xlim(-20, 20)
+        # plt.ylim(-20, 20)
         plt.draw()
         plt.pause(0.01)  # Pause to update the plot
 
@@ -204,7 +209,7 @@ def main():
     ]
 
     bspline_fitter = BSplineFitter(lidar_segments)  
-    bspline_curves, knot_points_list, control_points_list, centroids_list = bspline_fitter.fit_all_segments(knot_distance=0.5)
+    bspline_curves, knot_points_list, control_points_list, centroids_list, tck_list = bspline_fitter.fit_all_segments(knot_distance=0.5)
     bspline_fitter.visualize()
 
 if __name__ == "__main__":

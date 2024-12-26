@@ -6,7 +6,8 @@ from scipy.interpolate import BSpline
 from scipy import interpolate
 
 class SplineFitting:
-    def __init__(self, phi_range=(0, np.pi), num_points=500, noise_std=5 / 1000, degree=3, knot_spacing=2):
+    # def __init__(self, phi_range=(0, np.pi), num_points=500, noise_std=5 / 1000, degree=3, knot_spacing=2):
+    def __init__(self, phi_range=(np.pi/2 - 0.5 , np.pi/2 + 0.5 ), num_points=100, noise_std=5 / 1000, degree=3, knot_spacing=1):
         self.phi_range = phi_range
         self.num_points = num_points
         self.noise_std = noise_std
@@ -33,6 +34,7 @@ class SplineFitting:
         points = np.column_stack([self.x_noisy, self.y_noisy])
         distances = np.linalg.norm(np.diff(points, axis=0), axis=1)
         self.curve_length = np.sum(distances)
+        print("Curve Length: ", self.curve_length)
 
     def get_uniform_knots(self):
         """Generate a knot vector with uniform spacing."""
@@ -103,7 +105,7 @@ class SplineFitting:
 
 
 if __name__ == "__main__":
-    spline_fitter = SplineFitting(knot_spacing=2)
+    spline_fitter = SplineFitting()
     spline_fitter.generate_data()  # Generate the data
     spline_fitter.fit_bspline()   # Fit the B-spline
     spline_fitter.plot_bspline()  # Plot the results
