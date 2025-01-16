@@ -10,6 +10,7 @@ from nav_msgs.msg import Odometry
 from landmark_extract import utils as Utils
 from std_msgs.msg import String
 import json
+import matplotlib.pyplot as plt
 
 import time
 import sys
@@ -33,10 +34,13 @@ class EKF_SLAM(Node):  # MODIFY NAME
 
         # Declare parameters
         self.declare_parameter('odometry_topic', "/diff_cont/odom")
+        self.declare_parameter('measurement_topic', "/measurement_data")
 
         # Subscribers
         self.odom_sub = self.create_subscription(Odometry, self.get_parameter('odometry_topic').value, self.odomCB, 10)
-        self.subscription = self.create_subscription(String, 'Pseudo_matrices', self.matrixCB, 10)
+        # self.subscription = self.create_subscription(String, 'pseudo_matrices', self.matrixCB, 10)
+        # self.range_bearing_subscriber = self.create_subscription(String, "range_bearing_segments", self.range_bearingCB, 10)
+        self.subscription = self.create_subscription(String, self.get_parameter('measurement_topic').value, self.measurement_CB, 10)
 
         # State initialization
         self.xEst = np.zeros(STATE_SIZE)  # Initial state [x, y, yaw]
@@ -45,8 +49,13 @@ class EKF_SLAM(Node):  # MODIFY NAME
         self.last_pose = None
         self.last_stamp = None
         
+        #Flags
+        self.matrixes_recieved_flag = False
+        self.range_bearing_recieved_flag = False
+        
         # various data containers used in the EKF algorithm
         self.odometry_data = np.array([0.0, 0.0, 0.0])
+        self.measurement_data = []
         
         self.get_logger().info('EKF SLAM node has been initialized.')
 
@@ -85,26 +94,73 @@ class EKF_SLAM(Node):  # MODIFY NAME
             self.last_stamp = msg.header.stamp
             self.odom_initialized = True
             
-        self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, None)
+        # self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, None)
         # self.get_logger().info(f"Predicted state: {self.xEst}")
         
-    def matrixCB(self, msg):
+    def measurement_CB(self, msg):
+        """
+        Callback to process the received message.
+        """
+        try:
             # Deserialize the JSON data
-            matrices_data = json.loads(msg.data)
-            self.get_logger().info(f'Received {len(matrices_data)} matrices.')
+            combined_data = json.loads(msg.data)
+            self.measurement_data = []
+            self.measurement_data = combined_data
 
-            for matrix_info in matrices_data:
-                matrix_id = matrix_info['id']
-                rows = matrix_info['rows']
-                cols = matrix_info['cols']
-                data = matrix_info['data']
+            # Process each entry in the combined data
+            for entry in combined_data:
+                matrix_id = entry.get('id')
+                rows = entry.get('rows')
+                cols = entry.get('cols')
+                matrix_data = entry.get('data')
+                range_bearing_data = entry.get('range_bearing_data')
 
+                self.get_logger().info(f"Received matrix ID: {matrix_id}")
+                # self.get_logger().info(f"Matrix dimensions: {rows}x{cols}")
+                # self.get_logger().info(f"Matrix data: {matrix_data}")
+                # self.get_logger().info(f"Range-bearing data: {range_bearing_data}")
+
+                # If needed, reconstruct the matrix from the flattened data
                 if rows > 0 and cols > 0:
-                    matrix = np.array(data).reshape(rows, cols)
-                    self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}\n')
-                    # self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}\n{matrix}')
-                else:
-                    self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
+                    matrix = np.array(matrix_data).reshape(rows, cols)
+                    # self.get_logger().info(f"Reconstructed matrix:\n{matrix}")
+
+        except json.JSONDecodeError as e:
+            self.get_logger().error(f"Failed to decode JSON: {e}")
+            
+        self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data)
+
+        
+    def matrixCB(self, msg):
+        # Deserialize the JSON data
+        matrices_data = json.loads(msg.data)
+        self.get_logger().info(f'Received {len(matrices_data)} matrices.')
+
+        for matrix_info in matrices_data:
+            matrix_id = matrix_info['id']
+            rows = matrix_info['rows']
+            cols = matrix_info['cols']
+            data = matrix_info['data']
+
+            if rows > 0 and cols > 0:
+                matrix = np.array(data).reshape(rows, cols)
+                self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}')
+                # self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}\n{matrix}')
+            else:
+                self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
+                
+        self.matrixes_recieved_flag = True
+        
+    def range_bearingCB(self, msg):
+        # Parse the JSON data
+        try:
+            range_bearing_segments = json.loads(msg.data)
+            # Process the received segments
+            self.get_logger().info(f"Received range-bearing segments: {range_bearing_segments}")
+        except json.JSONDecodeError as e:
+            self.get_logger().error(f"Failed to parse JSON: {e}")
+            
+        self.range_bearing_recieved_flag = True
 
         
         
@@ -123,6 +179,44 @@ def EKF_SLAM_step(xEst, PEst, u, z):
     #Intermediate matrices to store the predicted state and covariance matrix
     xPredicted = xEst
     pPredicted = PEst
+    
+
+    
+    #Update
+    for entry in z: #for each obeservation
+        matrix_id = entry.get('id')
+        rows = entry.get('rows')
+        cols = entry.get('cols')
+        if rows > 0 and cols > 0:
+            #Process if valid feature
+            # landmark_id = search_correspond_LM_ID(xEst, PEst, entry)
+            new_landmark = True
+            
+            if new_landmark is True:
+                print("New LM")
+                x_coordinates, y_coordinates = calc_landmark_positions(xEst, entry)
+                
+                PAug = calc_augmented_covariance(xEst, PEst, entry)
+          
+                
+                # plt.scatter(x_coordinates, y_coordinates)
+                # plt.show()
+                
+                
+                #xAug
+                #PAug
+        else:
+            # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
+            print(f"Matrix ID: {matrix_id} is a placeholder.")
+            
+    # plt.plot(xEst[0], xEst[1], '.r')
+    # plt.draw()
+    # plt.pause(0.01)  # Pause to update the plot
+        
+  
+        
+        
+    
     
     return xEst, PEst
     
@@ -207,8 +301,148 @@ def calc_n_lm(x):
     n = int((len(x) - STATE_SIZE) / LM_SIZE)
     return n
 
+def search_correspond_LM_ID(xEst, PEst, z):
+    
+    return True
 
+def calc_landmark_positions(xEst, entry):
+    
+    # Extract robot pose
+    x_r = xEst[0]  # Robot's x position
+    y_r = xEst[1]  # Robot's y position
+    phi_r = xEst[2]  # Robot's orientation (yaw)
+    
+    matrix_id = entry.get('id')
+    print(f"Processing matrix ID: {matrix_id}")
 
+    # Extract the transformation matrix Φ from the entry
+    rows = entry.get('rows')
+    cols = entry.get('cols')
+    matrix_data = entry.get('data')
+    
+    if rows > 0 and cols > 0:
+        phi_matrix = np.array(matrix_data).reshape(rows, cols)
+        # self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}')
+        # self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}\n{matrix}')
+    else:
+        # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
+        print(f"Matrix ID: {matrix_id} is a placeholder.")
+
+    # Extract range and bearing data
+    range_bearing_data = np.array(entry.get('range_bearing_data', []))
+    print(f"Range-bearing data: {range_bearing_data}")  
+
+    # Initialize lists for landmark coordinates
+    x_landmarks = []
+    y_landmarks = []
+    
+    # Calculate the position of each landmark in the observation
+    for data in range_bearing_data:
+        z_p = data[0]  # Range to the landmark
+        tau_p = data[1]  # Bearing to the landmark
+        
+        # Calculate the x and y coordinates
+        x_lm = x_r + z_p * np.cos(phi_r + tau_p)
+        y_lm = y_r + z_p * np.sin(phi_r + tau_p)
+        
+        x_landmarks.append(x_lm)
+        y_landmarks.append(y_lm)
+    
+    # Convert lists to numpy arrays
+    x_coordinates = np.array(x_landmarks)
+    y_coordinates = np.array(y_landmarks)
+    
+    #Print matrix shape
+    # print(f"Matrix shape: {phi_matrix.shape}")
+    #Print landmark coordinates shape
+    # print(f"Landmark x-coordinates shape: {x_coordinates.shape}")
+    
+    transformed_x_coordinates = phi_matrix @ x_coordinates
+    transformed_y_coordinates = phi_matrix @ y_coordinates
+    #Print transformed x-coordinates shape
+    print(f"Transformed x-coordinates shape: {transformed_x_coordinates.shape}")
+    #Print transformed y-coordinates shape
+    print(f"Transformed y-coordinates shape: {transformed_y_coordinates.shape}")
+    
+    return transformed_x_coordinates, transformed_y_coordinates
+
+def calc_augmented_covariance(xEst, PEst, entry):
+    # Extract robot pose
+    x_r = xEst[0]  # Robot's x position
+    y_r = xEst[1]  # Robot's y position
+    phi_r = xEst[2]  # Robot's orientation (yaw)
+    
+    # Extract the transformation matrix Φ from the entry
+    matrix_id = entry.get('id')
+    rows = entry.get('rows')
+    cols = entry.get('cols')
+    matrix_data = entry.get('data')
+    
+    if rows > 0 and cols > 0:
+        phi_matrix = np.array(matrix_data).reshape(rows, cols)
+        # self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}')
+        # self.get_logger().info(f'Matrix ID: {matrix_id}, Shape: {rows}x{cols}\n{matrix}')
+    else:
+        # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
+        print(f"Matrix ID: {matrix_id} is a placeholder.")
+        
+    # Extract range and bearing data
+    range_bearing_data = np.array(entry.get('range_bearing_data', []))
+        
+    # Partial derivatives of the transformation matrix
+    
+    # Placeholder for the matrix
+    rows_x = []
+    rows_y = []
+    top_diag_list = []
+    bottom_diag_list = []
+
+    # Calculate the position of each landmark in the observation
+    for data in range_bearing_data:
+        z_p = data[0]  # Range to the landmark
+        tau_p = data[1]  # Bearing to the landmark
+        
+        # Calculate mu_p (angle adjustment)
+        mu_p = phi_r + tau_p
+        
+        sin_mu_p = np.sin(mu_p)
+        cos_mu_p = np.cos(mu_p)
+        
+        # Calculate the components for the matrix row
+        row_x = [1, 0, -z_p * sin_mu_p]
+        row_y = [0, 1, z_p * cos_mu_p]
+        
+        rows_x.append(row_x)
+        rows_y.append(row_y)
+        top_diag_list.append(cos_mu_p)
+        bottom_diag_list.append(sin_mu_p)
+
+    # Convert the rows into a NumPy matrix
+    top_matrix = np.array(rows_x)
+    # print(f"Top matrix shape: {top_matrix.shape}")
+    bottom_matrix = np.array(rows_y)
+    # print(f"Bottom matrix shape: {bottom_matrix.shape}")
+    dgs_dxr = np.vstack(((phi_matrix @ top_matrix), (phi_matrix @ bottom_matrix)))
+    # print(f"DGs/Dxr shape: {dgs_dxr.shape}")
+    
+    top_diag_matrix = np.diag(top_diag_list)
+    # print(f"Top diag matrix shape: {top_diag_matrix.shape}")
+    bottom_diag_matrix = np.diag(bottom_diag_list)
+    # print(f"Bottom diag matrix shape: {bottom_diag_matrix.shape}")
+    dgs_dz = np.vstack(((phi_matrix @ top_diag_matrix), (phi_matrix @ bottom_diag_matrix)))
+    # print(f"DGs/Dz shape: {dgs_dz.shape}")
+        
+    
+    
+    #Jacobians
+    G_x = None
+    
+    G_z = None
+    
+    PAug = G_x * PEst * G_x.T + G_z * M * G_z.T
+    PAug = 0
+    return PAug
+    
 def main(args=None):
     rclpy.init(args=args)
     node = EKF_SLAM()  # MODIFY NAME

@@ -42,7 +42,9 @@ class myNode(Node):
   		# Publisher for visualization
 		self.segment_publisher = self.create_publisher(MarkerArray, "/scan_segments", 10)
 		self.publisher = self.create_publisher(BsplineArray, '/bspline_curves', 10)
-		self.publisher = self.create_publisher(String, '/Pseudo_matrices', 10)
+		# self.publisher = self.create_publisher(String, '/pseudo_matrices', 10)
+		# self.range_bearing_publisher = self.create_publisher(String, "/range_bearing_segments", 10)
+		self.data_publisher = self.create_publisher(String, "/measurement_data", 10)
 
 		self.alpha_max = np.pi / 4  # Angular threshold
 		self.eta = 2 # Length threshold	
@@ -73,6 +75,12 @@ class myNode(Node):
 		scan_segments, range_bearing_segments, excution_time = self.segment_scan(ranges, angles, self.alpha_max, self.eta, self.min_segment_length)
 		self.scan_segments = scan_segments
 		self.publish_segments(scan_segments)
+		
+  
+		#Print range and bearing segments
+		for i, segment in enumerate(range_bearing_segments):
+			self.get_logger().info(f"Segment {i}: {len(segment)}")
+
   
   
 		# bezier_fitter = BezierCurveFitter(scan_segments)
@@ -99,14 +107,16 @@ class myNode(Node):
 		#V3
 		self.bspline_fitter.feed_lidar_segments(scan_segments)
 		self.bspline_fitter.fit_all_segments(knot_spacing=1)
-		self.bspline_fitter.calculate_knot_segment_lengths()
+		# self.bspline_fitter.calculate_knot_segment_lengths()
 		# self.bspline_fitter.visualize()
 		self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list = self.bspline_fitter.send_results()
 		# self.bspline_fitter.visualize_continues()
 		# # self.bspline_fitter.fit_bspline_to_lidar(self.scan_segments[3], knot_distance=0.5)
 		# # self.bspline_fitter.plot_bspline()
   
-		self.publish_all_matrices(self.B_pseudoinverse_list)
+		# self.publish_range_bearing_segments(range_bearing_segments)
+		# self.publish_all_matrices(self.B_pseudoinverse_list)
+		self.publish_data(self.B_pseudoinverse_list, range_bearing_segments)
 		
   
 
@@ -124,6 +134,7 @@ class myNode(Node):
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
 		# self.plot_segments_continous()
+  
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []
 
@@ -143,12 +154,70 @@ class myNode(Node):
 					'data': [],  # Empty data for placeholder
 				})
 
+		# #Print range and bearing segments
+		# for matrix_id, matrix in enumerate(matrix_list):
+		# 	self.get_logger().info(f"Matrix_number {matrix_id}: Colums { matrix.shape[1]}")
+   
 		# Serialize the data to JSON for publishing
 		message = String()
 		message.data = json.dumps(matrices_data)
 
 		self.publisher.publish(message)
 		self.get_logger().info(f'Published {len(matrices_data)} matrices.')
+  
+	def publish_range_bearing_segments(self, range_bearing_segments):
+		# Convert numpy arrays to lists for JSON serialization
+		range_bearing_serializable = [segment.tolist() for segment in range_bearing_segments]
+		
+		# Serialize to JSON
+		range_bearing_json = json.dumps(range_bearing_serializable)
+		
+		# Publish as a String message
+		msg = String()
+		msg.data = range_bearing_json
+		self.range_bearing_publisher.publish(msg)
+  
+	def publish_data(self, matrix_list, range_bearing_segments):
+		"""
+		Publishes matrices and their corresponding range-bearing segments together in JSON format.
+
+		Args:
+			matrix_list: List of numpy arrays representing matrices.
+			range_bearing_segments: List of numpy arrays representing range-bearing segments.
+		"""
+		if len(matrix_list) != len(range_bearing_segments):
+			self.get_logger().error("The number of matrices and range-bearing segments do not match.")
+			return
+
+		serialized_data = []
+
+		for matrix_id, (matrix, range_bearing) in enumerate(zip(matrix_list, range_bearing_segments)):
+			# Process matrix data
+			if matrix.size > 0:  # Matrix is not a placeholder
+				serialized_data.append({
+					'id': matrix_id,
+					'rows': matrix.shape[0],
+					'cols': matrix.shape[1],
+					'data': matrix.flatten().tolist(),
+					'range_bearing_data': range_bearing.tolist(),  # Serialize range-bearing data
+				})
+			else:  # Placeholder for matrix
+				serialized_data.append({
+					'id': matrix_id,
+					'rows': 0,
+					'cols': 0,
+					'data': [],  # Empty data for placeholder
+					'range_bearing_data': range_bearing.tolist(),  # Still include range-bearing data
+				})
+
+		# Serialize the combined data to JSON
+		message = String()
+		message.data = json.dumps(serialized_data)
+
+		# Publish the message
+		self.data_publisher.publish(message)
+		self.get_logger().info(f'Published {len(serialized_data)} combined matrix and range-bearing segments.')
+
 
 	def publish_segments(self, scan_segments):
 		marker_array = MarkerArray()

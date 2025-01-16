@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import splprep, splev
 from scipy.interpolate import BSpline
-from scipy.integrate import quad
 import logging
 
 logging.basicConfig(level=logging.WARNING)
@@ -28,7 +27,6 @@ class BSplineFitter:
         self.B_pseudoinverse_list = []
         self.reversed_control_points_list = []
         self.r_spline_list = []
-        self.knot_segment_lenghts_list = []
         
     
     def feed_lidar_segments(self, lidar_segments):
@@ -51,8 +49,8 @@ class BSplineFitter:
             return curve_length, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder
         
         knots, control_points = self.calculate_knots_control_points(curve_length, x, y, degree=3, knot_spacing=knot_spacing)
-        print(f'Knots length: {len(knots)}')
-        print(f'Control Points length: {len(control_points)}')
+        # print(f'Knots length: {len(knots)}')
+        # print(f'Control Points length: {len(control_points)}')
         spline = BSpline(knots, control_points, degree)
         Collocation_Matrix, B_pseudoinverse, reversed_control_points, r_spline = self.calculate_collocation_matrix(curve_length, x, y, knots, degree=3, knot_spacing=knot_spacing)
         
@@ -152,7 +150,7 @@ class BSplineFitter:
             curve_length, knots, control_points, spline, Collocation_Matrix, B_pseudoinverse, reversed_control_points, r_spline = self.fit_bspline_to_lidar(
                 segment, knot_spacing
             )
-            print(f'Curve Length: {curve_length}')
+            # print(f'Curve Length: {curve_length}')
             
             # Store results
             self.curve_length_list.append(curve_length)
@@ -164,7 +162,7 @@ class BSplineFitter:
             self.reversed_control_points_list.append(reversed_control_points)
             self.r_spline_list.append(r_spline)
         
-        print(f'Curve Length List: {len(self.curve_length_list)}')
+        # print(f'Curve Length List: {len(self.curve_length_list)}')
                 
     def send_results(self):
         if  self.Collocation_Matrix_list is None:
@@ -172,38 +170,6 @@ class BSplineFitter:
 
         return self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list
                 
-    def calculate_knot_segment_lengths(self):
-        """Calculate the length of the reversed B-spline between each pair of consecutive knots."""
-        if self.r_spline is None:
-            raise ValueError("You must fit the reversed B-spline before calculating segment lengths.")
-        
-        # Clear previous results
-        self.knot_segment_lenghts_list = []
-        
-        for j in range(len(self.r_spline_list)):
-
-            segment_lengths = []
-            knots = self.knots_list[j]
-            r_spline = self.r_spline_list[j]
-            
-            for i in range(len(knots) - 1):
-                if knots[i] == knots[i + 1]:  # Skip duplicate knots
-                    continue
-                
-                # Define the integrand for arc length calculation
-                def integrand(t):
-                    dxdt, dydt = r_spline(t, nu=1).T  # Derivative of the spline
-                    return np.sqrt(dxdt**2 + dydt**2)
-                
-                # Integrate between consecutive knots
-                length, _ = quad(integrand, knots[i], knots[i + 1])
-                segment_lengths.append(length)
-            
-            print("Segment Lengths between Knots:", segment_lengths)
-            
-            self.knot_segment_lenghts_list.append(segment_lengths)
-           
-    
     def plot_bspline(self):
         """Plot the original data, noisy data, fitted B-spline, control points, and knots."""
         if self.spline is None:
@@ -353,9 +319,9 @@ class BSplineFitter:
 # Example usage
 def main():
     lidar_segments = [
-        np.array([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]),  # Example straight segment
+        # np.array([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]),  # Example straight segment
         # np.array([[0, 0], [1, 0] ]),  # Example straight segment
-        # np.array([[0, 0], [0.8, 0] ]), # Gives an error
+        np.array([[0, 0], [0.8, 0] ]), # Gives an error
         np.array([[4, 0], [4.5, 0.2], [5.5, 0.9], [5.9, 1.5], [6, 2]])  # Example curved segment
     ]
 
@@ -363,7 +329,6 @@ def main():
     bspline_fitter.feed_lidar_segments(lidar_segments)  
     bspline_fitter.fit_all_segments(knot_spacing=1)
     # bspline_fitter.fit_all_segments(knot_distance=0.5) #Over fitting with reversed spline
-    bspline_fitter.calculate_knot_segment_lengths()
     bspline_fitter.visualize()
 
 if __name__ == "__main__":
