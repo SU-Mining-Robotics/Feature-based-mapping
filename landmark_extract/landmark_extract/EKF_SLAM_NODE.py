@@ -11,6 +11,7 @@ from landmark_extract import utils as Utils
 from std_msgs.msg import String
 import json
 import matplotlib.pyplot as plt
+from scipy.linalg import block_diag
 
 import time
 import sys
@@ -23,6 +24,12 @@ sys.path.append(script_dir)
 
 # EKF state covariance
 M = np.diag([0.5, 0.5, np.deg2rad(30.0)]) ** 2
+# EKF measurement covariance of a single lidar beam
+R = np.diag([0.1, np.deg2rad(1.0)]) ** 2
+
+q = 1
+R_new = block_diag(*[R] * (q + 1))
+print(f"R_new shape: {R_new.shape}")
 
 STATE_SIZE = 3  # State size [x, y, yaw]
 LM_SIZE = 2  # Landmark size [x, y]
@@ -52,10 +59,12 @@ class EKF_SLAM(Node):  # MODIFY NAME
         #Flags
         self.matrixes_recieved_flag = False
         self.range_bearing_recieved_flag = False
+        self.EKF_test = True
         
         # various data containers used in the EKF algorithm
         self.odometry_data = np.array([0.0, 0.0, 0.0])
         self.measurement_data = []
+        self.feature_size_vector = []
         
         self.get_logger().info('EKF SLAM node has been initialized.')
 
@@ -128,7 +137,10 @@ class EKF_SLAM(Node):  # MODIFY NAME
         except json.JSONDecodeError as e:
             self.get_logger().error(f"Failed to decode JSON: {e}")
             
-        self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data)
+            
+        if self.EKF_test == True:
+            self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector)
+            self.EKF_test = False
 
         
     def matrixCB(self, msg):
@@ -165,7 +177,7 @@ class EKF_SLAM(Node):  # MODIFY NAME
         
         
             
-def EKF_SLAM_step(xEst, PEst, u, z):
+def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
     '''
     Main EKF SLAM algorithm
     '''
@@ -194,9 +206,10 @@ def EKF_SLAM_step(xEst, PEst, u, z):
             
             if new_landmark is True:
                 print("New LM")
-                x_coordinates, y_coordinates = calc_landmark_positions(xEst, entry)
-                
+                x_coordinates, y_coordinates, feature_size_vector = calc_landmark_positions(xEst, entry, feature_size_vector)
+               
                 PAug = calc_augmented_covariance(xEst, PEst, entry)
+                xEst = np.hstack((xEst, x_coordinates, y_coordinates))
           
                 
                 # plt.scatter(x_coordinates, y_coordinates)
@@ -305,7 +318,7 @@ def search_correspond_LM_ID(xEst, PEst, z):
     
     return True
 
-def calc_landmark_positions(xEst, entry):
+def calc_landmark_positions(xEst, entry, feature_size_vector):
     
     # Extract robot pose
     x_r = xEst[0]  # Robot's x position
@@ -364,7 +377,12 @@ def calc_landmark_positions(xEst, entry):
     #Print transformed y-coordinates shape
     print(f"Transformed y-coordinates shape: {transformed_y_coordinates.shape}")
     
-    return transformed_x_coordinates, transformed_y_coordinates
+    #Get number of rows and columns
+    rows = len(transformed_x_coordinates)
+    feature_data_size = rows * 2
+    feature_size_vector.append(feature_data_size)
+    
+    return transformed_x_coordinates, transformed_y_coordinates, feature_size_vector
 
 def calc_augmented_covariance(xEst, PEst, entry):
     # Extract robot pose
@@ -430,17 +448,48 @@ def calc_augmented_covariance(xEst, PEst, entry):
     bottom_diag_matrix = np.diag(bottom_diag_list)
     # print(f"Bottom diag matrix shape: {bottom_diag_matrix.shape}")
     dgs_dz = np.vstack(((phi_matrix @ top_diag_matrix), (phi_matrix @ bottom_diag_matrix)))
-    # print(f"DGs/Dz shape: {dgs_dz.shape}")
+    print(f"DGs/Dz shape: {dgs_dz.shape}")
         
+    # Jacobians
+    # Calculating G_x
+    top = np.eye(xEst.shape[0])
+    # print(f"Top shape: {top.shape}")
+    
+    if dgs_dxr.shape[1] == xEst.shape[0]:
+        G_x = np.vstack((top, dgs_dxr))     #Building matrix for first landmark
+        # print(f"G_x shape: {G_x.shape}")
+    else:
+        bottom = np.zeros((dgs_dxr.shape[0], xEst.shape[0] - dgs_dxr.shape[1]))
+        # print(f"Bottom shape: {bottom.shape}")
+        G_x = np.vstack((top, np.hstack((dgs_dxr, bottom))))
+        # print(f"G_x shape: {G_x.shape}")
+
+    #Calculating G_z
+    G_z = np.vstack((np.zeros((xEst.shape[0], dgs_dz.shape[1])), dgs_dz))
+    # print(f"G_z shape: {G_z.shape}")
+   
+    # G_x = None
+    
+    # G_z = None
+    print(f"G_x shape: {G_x.shape}")
+    print(f"PEst shape: {PEst.shape}")
+    
+    print(f"G_z shape: {G_z.shape}")
+    print(f"M shape: {M.shape}")
+ 
     
     
-    #Jacobians
-    G_x = None
-    
-    G_z = None
-    
-    PAug = G_x * PEst * G_x.T + G_z * M * G_z.T
+    First = G_x @ PEst @ G_x.T
+    print(f'Gx', G_x)
+    print(f'PEst', PEst)
+    print(f'Gx.T', G_x.T)
+    print(f"gx @ PEst", G_x @ PEst)
+    print(f"First:", First)
+    print(f"First shape: {First.shape}")
+    Second = G_z @ M @ G_z.T
+    PAug = G_x @ PEst @ G_x.T + G_z @ M @ G_z.T
     PAug = 0
+    
     return PAug
     
 def main(args=None):
