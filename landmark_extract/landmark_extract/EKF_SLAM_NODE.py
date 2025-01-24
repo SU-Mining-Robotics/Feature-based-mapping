@@ -12,6 +12,9 @@ from std_msgs.msg import String
 import json
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
+from Test_scipts.Observation_model import SplineLaserPredictor
+
+
 
 import time
 import sys
@@ -208,16 +211,20 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
                 print("New LM")
                 x_coordinates, y_coordinates, feature_size_vector = calc_landmark_positions(xEst, entry, feature_size_vector)
                
-                PAug = calc_augmented_covariance(xEst, PEst, entry)
+                PAug = calc_augmented_covariance(xEst, PEst, entry) # Need to fix R
                 xEst = np.hstack((xEst, x_coordinates, y_coordinates))
-          
+
+                #Predict mesaurement
+                z_bar = predict_measurement(xEst, entry, x_coordinates, y_coordinates)
+                
+                z = 0 #placeholder
                 
                 # plt.scatter(x_coordinates, y_coordinates)
                 # plt.show()
                 
                 
-                #xAug
-                #PAug
+                xEst = xEst
+                PEst = PAug
         else:
             # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
             print(f"Matrix ID: {matrix_id} is a placeholder.")
@@ -486,12 +493,58 @@ def calc_augmented_covariance(xEst, PEst, entry):
     print(f"gx @ PEst", G_x @ PEst)
     print(f"First:", First)
     print(f"First shape: {First.shape}")
-    Second = G_z @ M @ G_z.T
-    PAug = G_x @ PEst @ G_x.T + G_z @ M @ G_z.T
-    PAug = 0
+    # Second = G_z @ M @ G_z.T
+    # PAug = G_x @ PEst @ G_x.T + G_z @ M @ G_z.T
+    PAug = First
     
     return PAug
+   
+def predict_measurement(xEst, entry, x_coordinates, y_coordinates):
+    # Extract robot pose
+    x_r = xEst[0]  # Robot's x position
+    y_r = xEst[1]  # Robot's y position
+    phi_r = xEst[2]  # Robot's orientation (yaw)
+    pose = np.array([x_r, y_r, phi_r])
     
+    control_points = np.array([x_coordinates, y_coordinates])
+    
+    # Extract range and bearing data
+    range_bearing_data = np.array(entry.get('range_bearing_data', []))
+    
+    tau_p_list = []
+    for data in range_bearing_data:
+        tau_p = data[1]
+        tau_p_list.append(tau_p) 
+    
+    
+    # print("f.tau_p_list", tau_p_list)
+    # z = []
+    
+    # for data in range_bearing_data:
+    #     z_p = data[0]  # Range to the landmark
+    #     tau_p = data[1]  # Bearing to the landmark
+    
+    
+    # # Extraxt control points (landmarks)
+   
+    # print(f"Robot pose: {pose}")
+    # print(f"Bearing", tau_p)
+    # print(f"Control_points", control_points.T)
+    
+    # # Initialize the predictor
+    predictor = SplineLaserPredictor(control_points.T, tau_p, pose)
+    z = predictor.predict_distances(tau_p_list, pose, control_points.T)
+    predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
+    
+    # print(f"Predicted measurements: {z}")
+    # predictor.visualize_prediction()
+    
+    return 0
+    
+
+    
+    
+     
 def main(args=None):
     rclpy.init(args=args)
     node = EKF_SLAM()  # MODIFY NAME
