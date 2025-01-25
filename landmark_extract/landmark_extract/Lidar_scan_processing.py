@@ -36,8 +36,8 @@ from scipy.interpolate import interpolate
 class myNode(Node):
 	def __init__(self):
 		super().__init__("Lidar_proccesing_node")  
-		# self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10)
-		self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10)
+		self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10)
+		# self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10)
   
   		# Publisher for visualization
 		self.segment_publisher = self.create_publisher(MarkerArray, "/scan_segments", 10)
@@ -47,8 +47,9 @@ class myNode(Node):
 		self.data_publisher = self.create_publisher(String, "/measurement_data", 10)
 
 		self.alpha_max = np.pi / 4  # Angular threshold
-		self.eta = 2 # Length threshold	
+		self.eta = 2 #Length threshold	Default = 2
 		self.min_segment_length = 6  # Set minimum segment length to avoid segments with only 1 point
+		self.min_segmentation_threshold = 0.1 # Set minimum distance to avoid segmetation of points that are too close to each other
   
 		self.saveScanData = saveScanData()
 		self.lenghts = []
@@ -62,6 +63,8 @@ class myNode(Node):
   
 		# self.create_timer(0.1, self.plot_segment_continous)
 		# plt.ion()  
+		self.ranges = []
+		self.angles = []
   
 		self.get_logger().info("Lidar scan proccessing node has been started.")
 
@@ -71,8 +74,18 @@ class myNode(Node):
 		
 		ranges = np.array(msg.ranges)
 		angles = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)
+		self.lenghts = ranges
+		self.angles = angles
+  
+		#Cut scan with 1
+		# ranges = ranges[:-1] # For F1tenh thcar
+		# Check if scan and ranges are the same length
+		if len(ranges) != len(angles):
+			self.get_logger().error("Scan and ranges are not the same length.")
+			return
 		
-		scan_segments, range_bearing_segments, excution_time = self.segment_scan(ranges, angles, self.alpha_max, self.eta, self.min_segment_length)
+		
+		scan_segments, range_bearing_segments, excution_time = self.segment_scan(ranges, angles, self.alpha_max, self.eta, self.min_segment_length, self.min_segmentation_threshold)
 		self.scan_segments = scan_segments
 		self.publish_segments(scan_segments)
 		
@@ -98,25 +111,25 @@ class myNode(Node):
 		# ## bspline_fitter.visualize()
 		# bspline_fitter.visualize_continues()
 
-        ##V2
+        #V2
 		# self.bspline_fitter.feed_lidar_segments(scan_segments)
 		# bspline_curves, knot_points_list, control_points_list, centroids_list, tck_list = self.bspline_fitter.fit_all_segments(knot_distance=0.5)
 		# self.bspline_fitter.visualize_continues()
 		# self.publish_spline_data(tck_list)
   
-		#V3
-		self.bspline_fitter.feed_lidar_segments(scan_segments)
-		self.bspline_fitter.fit_all_segments(knot_spacing=1)
-		# self.bspline_fitter.calculate_knot_segment_lengths()
-		# self.bspline_fitter.visualize()
-		self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list = self.bspline_fitter.send_results()
-		# self.bspline_fitter.visualize_continues()
-		# # self.bspline_fitter.fit_bspline_to_lidar(self.scan_segments[3], knot_distance=0.5)
-		# # self.bspline_fitter.plot_bspline()
+		# #V3
+		# self.bspline_fitter.feed_lidar_segments(scan_segments)
+		# self.bspline_fitter.fit_all_segments(knot_spacing=1)
+		# # self.bspline_fitter.calculate_knot_segment_lengths()
+		# # self.bspline_fitter.visualize()
+		# self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list = self.bspline_fitter.send_results()
+		# # self.bspline_fitter.visualize_continues()
+		# # # self.bspline_fitter.fit_bspline_to_lidar(self.scan_segments[3], knot_distance=0.5)
+		# # # self.bspline_fitter.plot_bspline()
   
-		# self.publish_range_bearing_segments(range_bearing_segments)
-		# self.publish_all_matrices(self.B_pseudoinverse_list)
-		self.publish_data(self.B_pseudoinverse_list, range_bearing_segments)
+		# # self.publish_range_bearing_segments(range_bearing_segments)
+		# # self.publish_all_matrices(self.B_pseudoinverse_list)
+		# self.publish_data(self.B_pseudoinverse_list, range_bearing_segments)
 		
   
 
@@ -133,7 +146,7 @@ class myNode(Node):
 		# # Visualisation
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
-		# self.plot_segments_continous()
+		self.plot_segments_continous()
   
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []
@@ -268,7 +281,7 @@ class myNode(Node):
 
 		self.publisher.publish(msg)
 
-	def segment_scan(self, ranges, angles, alpha_max=np.pi/4, eta=1.5, min_segment_length=2):
+	def segment_scan(self, ranges, angles, alpha_max=np.pi/4, eta=1.5, min_segment_length=2, min_segment_threshold = 0.1):
 		start_time = time.time()  # Start timing
 
 		x_coords = np.array(ranges) * np.cos(angles)
@@ -314,7 +327,7 @@ class myNode(Node):
 			# 	current_segment = [points[i]]
 
 			# Pure distance check with flag to detect variance
-			if max(d_i, d_next) <= eta * min(d_i, d_next):
+			if (max(d_i, d_next) <= eta * min(d_i, d_next)) or (d_i <= min_segment_threshold and d_next <= min_segment_threshold):
 				current_segment.append(points[i])
 				current_range_bearing.append((ranges[i], angles[i]))
 			else:
@@ -328,6 +341,8 @@ class myNode(Node):
 					current_segment = [points[i]]
 					current_range_bearing = [(ranges[i], angles[i])]
 					distance_variance_detected = False
+     
+			
 
 		# Check if the last segment should wrap around and join with the first segment
 		if current_segment:
@@ -348,16 +363,30 @@ class myNode(Node):
 		for segment, rb_segment in zip(segments, range_bearing_segments):
 			sub_segment = [segment[0]]  # Start with the first point of the current segment
 			sub_range_bearing = [rb_segment[0]]  # Start with the first range and bearing
-			for j in range(1, len(segment) - 1):
+			
+			# for j in range(1, len(segment) - 1):
+			# 	# Vector between consecutive points within the segment
+			# 	p_j = segment[j] - segment[j - 1]
+			# 	p_next_j = segment[j + 1] - segment[j]
+			# 	# Lengt of vectors
+			# 	# d_j = np.linalg.norm(segment[j + 1]-segment[j-1])
+
+			n = 10 # Number of points to consider in angle check
+			for j in range(n, len(segment) - n):
 				# Vector between consecutive points within the segment
-				p_j = segment[j] - segment[j - 1]
-				p_next_j = segment[j + 1] - segment[j]
+				p_j = segment[j] - segment[j - n]
+				p_next_j = segment[j + n] - segment[j]
+
 
 				# Calculate angle between vectors within the segment
 				cos_alpha_j = np.dot(p_j, p_next_j) / (np.linalg.norm(p_j) * np.linalg.norm(p_next_j))
+    
+				# Lengt of vectors
+				d_j = np.linalg.norm(segment[j + 1]-segment[j-1])
 
 				# Check angle condition
-				if cos_alpha_j >= np.cos(alpha_max):
+				# if (cos_alpha_j >= np.cos(alpha_max)) or (d_j <= min_segment_threshold):
+				if (cos_alpha_j >= np.cos(alpha_max)):
 					sub_segment.append(segment[j])
 					sub_range_bearing.append(rb_segment[j])
 				else:
@@ -368,9 +397,11 @@ class myNode(Node):
 					sub_segment = [segment[j]]
 					sub_range_bearing = [rb_segment[j]]
 
-			# Add the last point of the current segment to the sub-segment
+			# Add the last point of the current segment to the sub-segment ()
 			sub_segment.append(segment[-1])
 			sub_range_bearing.append(rb_segment[-1])
+   
+			# Check if the sub-segment meets the minimum length
 			if len(sub_segment) >= min_segment_length:
 				final_segments.append(np.array(sub_segment))
 				final_range_bearing_segments.append(np.array(sub_range_bearing))
@@ -379,7 +410,8 @@ class myNode(Node):
 		end_time = time.time()
 		execution_time = end_time - start_time
 
-		return final_segments, final_range_bearing_segments, execution_time
+		# return segments, range_bearing_segments, execution_time	# Use this ln for the pure distance segmentation
+		return final_segments, final_range_bearing_segments, execution_time #Use the line for the angle segmentation
 
 
 	def visualise_scan_features(self, lenghts, angles):
@@ -429,6 +461,10 @@ class myNode(Node):
 		
 		segments = self.scan_segments
 		plt.clf()
+  
+		# Plot all points
+		# plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.5, color='red')
+
 		if self.scan_segments:
 			
 
@@ -439,11 +475,12 @@ class myNode(Node):
 					y_points = segment[:, 1]
 
 					# Plot the segment points
-					plt.plot(x_points, y_points, label=f'Segment {i+1}', marker='o', linestyle='-', markersize=4)
+					# plt.plot(x_points, y_points, label=f'Segment {i+1}', marker='o', linestyle='-', markersize=1)
+					plt.scatter(x_points, y_points, s=1,  label=f'Segment {i+1}')
 
 					# Highlight the start and end points
-					plt.plot(x_points[0], y_points[0], 'go', markersize=8, label=f'Start of Segment {i+1}')
-					plt.plot(x_points[-1], y_points[-1], 'ro', markersize=8, label=f'End of Segment {i+1}')
+					# plt.plot(x_points[0], y_points[0], 'go', markersize=8, label=f'Start of Segment {i+1}')
+					# plt.plot(x_points[-1], y_points[-1], 'ro', markersize=8, label=f'End of Segment {i+1}')
 
 			plt.xlabel("X Position")
 			plt.ylabel("Y Position")
@@ -452,6 +489,8 @@ class myNode(Node):
 			plt.axis("equal")
 			# plt.ylim(-5.5, 5.5)
 			# plt.xlim(-5.5, 5.5)
+			plt.xlim(-15, 15)
+			plt.ylim(-15, 15)
 			plt.tight_layout()
 			plt.grid(True)
 			plt.draw()

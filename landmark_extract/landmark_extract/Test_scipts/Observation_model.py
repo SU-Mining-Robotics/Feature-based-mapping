@@ -257,10 +257,10 @@ def main(args=None):
     robot_pose = np.array([0.0, 0.0, 0.0])  # Robot pose [x, y, theta]
     laser_angle = -2.7405292607843876  # Laser beam angle (in radians)
     laser_angle = -2.4405292607843876  # Laser beam angle (in radians)
-    laser_angle = -3.1405292607843876  # behaves wierd
-    laser_angle = -3.8405292607843876  #Still acceptable
-    laser_angle = -2.7405292607843876  # Wierd
-    laser_angle = -2.5405292607843876
+    # laser_angle = -3.1405292607843876  # behaves wierd
+    # laser_angle = -3.8405292607843876  #Still acceptable
+    # laser_angle = -2.7405292607843876  # Wierd
+    # laser_angle = -2.5405292607843876
     
     control_points = np.array([
         [-2.14050467,  2.01223198],
