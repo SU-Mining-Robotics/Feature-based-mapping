@@ -1,9 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-# Assuming CubicSplineSurface is already defined or imported
-class CubicSplineSurface: 
+class CubicSplineSurface:
     def __init__(self, **kwargs):
         # Parameters
         knot_space = kwargs['knot_space'] if 'knot_space' in kwargs else .05
@@ -27,7 +24,7 @@ class CubicSplineSurface:
         for i in range(0, self.degree+1):
             c[:,i] = mu-self.degree+i
         return c
-        
+
     """ Compute spline tensor coefficient index associated to the sparse representation """
     def compute_sparse_tensor_index(self, pts):
         # Compute spline along each axis
@@ -105,40 +102,3 @@ class CubicSplineSurface:
             return B, dBx, dBy
 
         return B, dBx, dBy
-
-def visualize_cubic_spline_surface():
-    # Create an instance of CubicSplineSurface
-    spline_surface = CubicSplineSurface(knot_space=0.5, surface_size=np.array([10., 10.]))
-    
-    # Generate a grid of points for evaluation
-    x = np.linspace(-5, 5, 100)
-    y = np.linspace(-5, 5, 100)
-    X, Y = np.meshgrid(x, y)
-    points = np.vstack([X.flatten(), Y.flatten()])
-    
-    # Compute the spline values at the grid points
-    B, _, _ = spline_surface.compute_tensor_spline(points, ORDER=0x01)
-    Z = B.dot(spline_surface.ctrl_pts).reshape(X.shape)  # Apply control points to compute the surface height
-    
-    # Plot the spline surface
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='k', alpha=0.8)
-    
-    # Add control points for reference
-    ctrl_pts_grid_x = np.arange(spline_surface.map_lower_limits[0], spline_surface.map_upper_limits[0], spline_surface.knot_space)
-    ctrl_pts_grid_y = np.arange(spline_surface.map_lower_limits[1], spline_surface.map_upper_limits[1], spline_surface.knot_space)
-    ctrl_pts_X, ctrl_pts_Y = np.meshgrid(ctrl_pts_grid_x, ctrl_pts_grid_y)
-    ctrl_pts_Z = spline_surface.ctrl_pts.reshape(ctrl_pts_X.shape)
-    ax.scatter(ctrl_pts_X, ctrl_pts_Y, ctrl_pts_Z, color='red', label='Control Points')
-
-    # Customize the plot
-    ax.set_title("Cubic Spline Surface", fontsize=16)
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.legend()
-    plt.show()
-
-# Run the visualization
-visualize_cubic_spline_surface()

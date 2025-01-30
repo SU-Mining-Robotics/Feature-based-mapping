@@ -21,7 +21,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(cpp_node src/my_first_cpp_node.cpp)
+add_executable(cpp_node src/my_first_node.cpp)
 ament_target_dependencies(cpp_node rclcpp)
 
 install(TARGETS
