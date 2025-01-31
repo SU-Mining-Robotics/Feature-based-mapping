@@ -36,8 +36,8 @@ from scipy.interpolate import interpolate
 class myNode(Node):
 	def __init__(self):
 		super().__init__("Lidar_proccesing_node")  
-		# self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
-		self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
+		self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
+		# self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
   
   		# Publisher for visualization
 		self.segment_publisher = self.create_publisher(MarkerArray, "/scan_segments", 10)
@@ -76,7 +76,7 @@ class myNode(Node):
 		self.angles = angles
   
 		#Cut scan with 1
-		ranges = ranges[:-1] # For F1tenh thcar
+		# ranges = ranges[:-1] # For F1tenh thcar
 		# Check if scan and ranges are the same length
 		if len(ranges) != len(angles):
 			self.get_logger().error("Scan and ranges are not the same length.")

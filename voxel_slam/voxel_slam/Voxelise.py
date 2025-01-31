@@ -1,5 +1,8 @@
 import rclpy
 from rclpy.node import Node
+from tf2_ros import Buffer, TransformListener
+from geometry_msgs.msg import TransformStamped
+from tf_transformations import quaternion_matrix
 from sensor_msgs.msg import PointCloud2
 from visualization_msgs.msg import Marker, MarkerArray
 import open3d as o3d
@@ -23,21 +26,53 @@ class PointCloudProcessor(Node):
         self.orignal_marker_publisher = self.create_publisher(MarkerArray, "/original_voxel_grid_markers", 10)
         self.voxel_size = 0.3  # Adjustable voxel size
         
+        # OdomTransformListener
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.timer = self.create_timer(0.1, self.get_transform)  # Query at 10Hz
+        
         self.first_scan = None
         self.first_voxel_grid = None
 
         self.get_logger().info("PointCloudProcessor node initialized.")
+        
+    def get_transform(self):
+        try:
+            # Lookup transform from 'odom' to 'base_link' (change as needed)
+            # transform: TransformStamped = self.tf_buffer.lookup_transform(
+            #     'odom', 'base_link', rclpy.time.Time())
+            transform: TransformStamped = self.tf_buffer.lookup_transform(
+                'base_link', 'odom', rclpy.time.Time())
+
+            # Extract translation
+            tx = transform.transform.translation.x
+            ty = transform.transform.translation.y
+            tz = transform.transform.translation.z
+
+            # Extract rotation (quaternion)
+            qx = transform.transform.rotation.x
+            qy = transform.transform.rotation.y
+            qz = transform.transform.rotation.z
+            qw = transform.transform.rotation.w
+
+            # Convert quaternion to 4x4 transformation matrix
+            transformation_matrix = quaternion_matrix([qx, qy, qz, qw])
+            transformation_matrix[:3, 3] = [tx, ty, tz]  # Set translation part
+
+            # self.get_logger().info(f"Transformation Matrix:\n{transformation_matrix}")
+            self.transformation_matrix = np.asarray(transformation_matrix)
+
+        except Exception as e:
+            self.get_logger().warn(f"Could not get transform: {str(e)}")
+
 
     def pointcloud_callback(self, msg):
-        # Convert ROS 2 PointCloud2 to Open3D point cloud
+        
         pcd = self.ros_to_open3d(msg)
-        # self.get_logger().info("Point cloud received with %d points." % len(pcd.points))
-
-        # Downsample the point cloud
-        downsampled_pcd = pcd.voxel_down_sample(self.voxel_size)  # Gives centroid of points in a voxel
-        # self.get_logger().info("Downsampled point cloud to %d points." % len(downsampled_pcd.points))
-
-        # Create a voxel grid
+        self.get_logger().info("Point cloud received with %d points." % len(pcd.points))
+        # Downsample pcd
+        downsampled_pcd = pcd.voxel_down_sample(self.voxel_size) 
+        self.get_logger().info("Downsampled point cloud to %d points." % len(downsampled_pcd.points))
         voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud(downsampled_pcd, voxel_size=self.voxel_size)
         # self.get_logger().info("Voxel grid created with %d voxels." % len(voxel_grid.get_voxels()))
         
@@ -48,41 +83,33 @@ class PointCloudProcessor(Node):
         
         # Save the first scan as an Open3D PointCloud
         if self.first_scan is None:
-            self.first_scan = voxel_centre_pcd  # Save the entire PointCloud, not just the points
+            self.first_scan = voxel_centre_pcd  # Save the first scan
             self.first_voxel_grid = voxel_grid
             self.get_logger().info("First scan saved.")
         else:
-            # Perform ICP
-            icp = o3d.pipelines.registration.registration_icp(
-                voxel_centre_pcd,             # Source: Open3D PointCloud
-                self.first_scan,              # Target: Open3D PointCloud
-                self.voxel_size,              # Max correspondence distance
-                np.eye(4),                    # Initial transformation
-                o3d.pipelines.registration.TransformationEstimationPointToPoint()
-            )
-            
-            # Apply the transformation to the point cloud
-            transformed_pcd = downsampled_pcd.transform(icp.transformation)
-            # self.get_logger().info("ICP performed.")
-            self.get_logger().info("Transformation matrix:\n" + str(icp.transformation))
-            
-            # Create a new voxel grid from the transformed point cloud
-            transformed_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud(transformed_pcd, voxel_size=self.voxel_size)
-            # self.get_logger().info("New voxel grid created after applying transformation.")
-            
+          
+            # Keeps scan in the same orientation as the first scan when in baselink frame
             original_marker_array = self.voxel_grid_to_markers(self.first_voxel_grid, msg.header, colour=[1.0, 0.0, 0.0])
-            transformed_marker_array = self.voxel_grid_to_markers(transformed_voxel_grid, msg.header, colour=[0.0, 0.0, 1.0])
-            
-            
-            self.transformed_marker_publisher.publish(transformed_marker_array)
             self.orignal_marker_publisher.publish(original_marker_array)
-        
-        # Convert the voxel grid to a MarkerArray for RViz
-        marker_array = self.voxel_grid_to_markers(voxel_grid, msg.header)
-        
-
-        # Publish the voxel grid as markers
-        self.marker_publisher.publish(marker_array)
+            
+            # Convert the voxel grid to a MarkerArray for RViz (Local scan)
+            marker_array = self.voxel_grid_to_markers(voxel_grid, msg.header, colour=[0.0, 1.0, 0.0])
+            self.marker_publisher.publish(marker_array)
+            
+            
+            trans_init = np.array([[1, 0, 0, 5.0],  # Rotation + translation
+                       [0, 1, 0, 0.0],  
+                       [0, 0, 1, 0.0],  
+                       [0, 0, 0, 1.0]])  # Homogeneous part
+            # Apply a transformation to the point cloud
+            # transformed_pcd =  self.first_scan.transform(trans_init)
+            # transformed_pcd =  self.first_scan.transform( self.transformation_matrix )
+            transformed_pcd =  voxel_centre_pcd.transform( self.transformation_matrix )
+            self.get_logger().info("Transformation matrix:\n" + str(self.transformation_matrix))
+            transformed_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud(transformed_pcd, voxel_size=self.voxel_size)
+            transformed_marker_array = self.voxel_grid_to_markers(transformed_voxel_grid, msg.header, colour=[0.0, 0.0, 1.0])
+            self.transformed_marker_publisher.publish(transformed_marker_array)
+            
         
         # self.get_logger().info("Voxel grid published as markers.")
 
