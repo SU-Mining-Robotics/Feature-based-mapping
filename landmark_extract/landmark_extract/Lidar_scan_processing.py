@@ -36,8 +36,8 @@ from scipy.interpolate import interpolate
 class myNode(Node):
 	def __init__(self):
 		super().__init__("Lidar_proccesing_node")  
-		self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
-		# self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
+		# self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
+		self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
   
   		# Publisher for visualization
 		self.segment_publisher = self.create_publisher(MarkerArray, "/scan_segments", 10)
@@ -127,7 +127,7 @@ class myNode(Node):
   
 		# # self.publish_range_bearing_segments(range_bearing_segments)
 		# # self.publish_all_matrices(self.B_pseudoinverse_list)
-		# self.publish_data(self.B_pseudoinverse_list, range_bearing_segments)
+		self.publish_data(self.B_pseudoinverse_list, range_bearing_segments)
 		
   
 
@@ -144,7 +144,7 @@ class myNode(Node):
 		# # Visualisation
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
-		self.plot_segments_continous()
+		# self.plot_segments_continous()
   
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []
@@ -472,8 +472,8 @@ class myNode(Node):
 		plt.clf()
   
 		# Plot all points
-		# plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.5, color='red')
-		# plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.5, color='red') #F1tenth
+		plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey')
+		# plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') #F1tenth
 
 		if self.scan_segments:
 			
@@ -493,6 +493,8 @@ class myNode(Node):
 					# plt.plot(x_points[0], y_points[0], 'go', markersize=8, label=f'Start of Segment {i+1}')
 					# plt.plot(x_points[-1], y_points[-1], 'ro', markersize=8, label=f'End of Segment {i+1}')
 
+			# Plot arrow at centre
+			plt.arrow(0, 0, 0.5, 0, head_width=0.1, head_length=0.1, fc='k', ec='k')
 			plt.xlabel("X Position")
 			plt.ylabel("Y Position")
 			plt.title("Segmented Points Visualization with Start and End Points")

@@ -28,10 +28,8 @@ class BSplineFitter:
         self.reversed_control_points_list = []
         self.r_spline_list = []
         
-    
     def feed_lidar_segments(self, lidar_segments):
         self.lidar_segments = lidar_segments
-
 
     def fit_bspline_to_lidar(self, lidar_segment, knot_spacing=1.0, degree=3):
         """
@@ -125,9 +123,6 @@ class BSplineFitter:
             r_spline = BSpline(knots, reversed_control_points, degree)
             
             return B, B_pseudoinverse, reversed_control_points, r_spline
-
-
-
 
     def fit_all_segments(self, knot_spacing=1.0):
         """
@@ -255,7 +250,6 @@ class BSplineFitter:
         plt.axis('equal')
         plt.show()
 
-            
     def visualize_continues(self):
         """Continuously visualize lidar segments, fitted B-spline curves, control points, and centroids."""
         if self.Collocation_Matrix_list is None:
@@ -313,8 +307,6 @@ class BSplineFitter:
         plt.draw()
         
         plt.pause(0.01)  # Pause to update the plot
-
-
 
 # Example usage
 def main():

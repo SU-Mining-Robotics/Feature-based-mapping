@@ -188,3 +188,11 @@ def world_to_map_slow(x,y,t, map_info):
                       [y]])
     map_c = rot*((world - trans) / float(scale))
     return map_c[0,0],map_c[1,0],t-angle
+
+def wrapAngle(radian):
+    radian = radian - 2 * np.pi * np.floor((radian + np.pi) / (2 * np.pi))
+    return radian
+
+def normalDistribution(mean, variance):
+    return np.exp(-(np.power(mean, 2) / variance / 2.0) / np.sqrt(2.0 * np.pi * variance))
+

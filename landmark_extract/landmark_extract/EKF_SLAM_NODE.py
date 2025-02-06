@@ -13,6 +13,7 @@ import json
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
 from Test_scipts.Observation_model import SplineLaserPredictor
+from Spline_map_visualiser import SplineMapVisualiser
 
 
 
@@ -144,7 +145,8 @@ class EKF_SLAM(Node):  # MODIFY NAME
         if self.EKF_test == True:
             self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector)
             self.EKF_test = False
-
+            
+        self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector)
         
     def matrixCB(self, msg):
         # Deserialize the JSON data
@@ -177,9 +179,6 @@ class EKF_SLAM(Node):  # MODIFY NAME
             
         self.range_bearing_recieved_flag = True
 
-        
-        
-            
 def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
     '''
     Main EKF SLAM algorithm
@@ -187,15 +186,13 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
     #Prediction step
     Gt, Vt, F = compute_dd_motion_model_jacobians(xEst, u)
     xEst[0:STATE_SIZE] = differential_drive_motion_model(xEst[0:STATE_SIZE], u)
-    PEst = Gt.T @ PEst @ Gt + Vt.T @ M @ Vt
+    # PEst = Gt.T @ PEst @ Gt + Vt.T @ M @ Vt
     # print(f"Predicted state: {xEst}")
     # print(f"Predicted covariance: {PEst}")
     
     #Intermediate matrices to store the predicted state and covariance matrix
     xPredicted = xEst
     pPredicted = PEst
-    
-
     
     #Update
     for entry in z: #for each obeservation
@@ -211,9 +208,13 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
                 print("New LM")
                 x_coordinates, y_coordinates, feature_size_vector = calc_landmark_positions(xEst, entry, feature_size_vector)
                
-                PAug = calc_augmented_covariance(xEst, PEst, entry) # Need to fix R
+                # PAug = calc_augmented_covariance(xEst, PEst, entry) # Need to fix R
                 xEst = np.hstack((xEst, x_coordinates, y_coordinates))
-
+                
+                print(f"xEst shape: {xEst}")
+                print(f'feature_size_vector shape: {feature_size_vector}')
+                
+               
                 #Predict mesaurement
                 z_bar = predict_measurement(xEst, entry, x_coordinates, y_coordinates)
                 
@@ -224,20 +225,19 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
                 
                 
                 xEst = xEst
-                PEst = PAug
+                # PEst = PAug
         else:
             # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
             print(f"Matrix ID: {matrix_id} is a placeholder.")
             
+    visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+    visualiser.plot_splines()
+
+            
     # plt.plot(xEst[0], xEst[1], '.r')
     # plt.draw()
     # plt.pause(0.01)  # Pause to update the plot
-        
-  
-        
-        
-    
-    
+
     return xEst, PEst
     
 
@@ -386,7 +386,7 @@ def calc_landmark_positions(xEst, entry, feature_size_vector):
     
     #Get number of rows and columns
     rows = len(transformed_x_coordinates)
-    feature_data_size = rows * 2
+    feature_data_size = rows 
     feature_size_vector.append(feature_data_size)
     
     return transformed_x_coordinates, transformed_y_coordinates, feature_size_vector
@@ -517,7 +517,7 @@ def predict_measurement(xEst, entry, x_coordinates, y_coordinates):
         tau_p_list.append(tau_p) 
     
     
-    # print("f.tau_p_list", tau_p_list)
+    print("f.tau_p_list", tau_p_list)
     # z = []
     
     # for data in range_bearing_data:
@@ -534,23 +534,20 @@ def predict_measurement(xEst, entry, x_coordinates, y_coordinates):
     # # Initialize the predictor
     predictor = SplineLaserPredictor(control_points.T, tau_p, pose)
     z = predictor.predict_distances(tau_p_list, pose, control_points.T)
-    predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
+    print(f"Predicted measurements: {z}")
+    # predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
     
     # print(f"Predicted measurements: {z}")
     # predictor.visualize_prediction()
     
     return 0
     
-
     
-    
-     
 def main(args=None):
     rclpy.init(args=args)
     node = EKF_SLAM()  # MODIFY NAME
     rclpy.spin(node)
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
