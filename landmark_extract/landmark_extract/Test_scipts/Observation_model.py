@@ -91,10 +91,10 @@ class SplineLaserPredictor:
         return derivative
 
     def compute_tangent_angle(self, t_star):
-        """Compute the tangent angle at t_star."""
+        """Compute the tangent angle at t_star, defined anticlockwise relative to the x-axis."""
         derivative = self.spline_derivative(self.control_points, t_star)
         tangent_angle = np.arctan2(derivative[1], derivative[0])  # atan2(dy, dx)
-        return tangent_angle
+        return (np.pi-(-tangent_angle))  # Negate to switch to anticlockwise
 
     def predict_measurement(self):
         """Predict the laser measurement for a single laser beam."""
@@ -144,6 +144,7 @@ class SplineLaserPredictor:
             np.ndarray: Array of predicted distances for each angle.
         """
         distances = []
+        t_stars = []
 
         for angle in angles:
             # Update the robot pose and control points for this calculation
@@ -187,8 +188,9 @@ class SplineLaserPredictor:
 
             # Append the result for this angle
             distances.append(predicted_distance)
+            t_stars.append(t_star)
 
-        return np.array(distances)
+        return np.array(distances), np.array(t_stars)
 
 
 
@@ -218,6 +220,10 @@ class SplineLaserPredictor:
         
         test_intersection_point = self.spline_function(self.control_points, 0.73)
         test_rotated_intersection_point = self.spline_function(transformed_points, 0.73)
+        spline_start = self.spline_function(self.control_points, 0.)
+        spline_end = self.spline_function(self.control_points, 1)
+        spline_start_rot = self.spline_function(transformed_points, 0)
+        spline_end_rot = self.spline_function(transformed_points, 1.0)
 
         # # Generate tangent line
         tangent_start = intersection_point - tangent_vector_normalized
@@ -233,6 +239,8 @@ class SplineLaserPredictor:
         plt.plot([tangent_start[0], tangent_end[0]], [tangent_start[1], tangent_end[1]], 
                 label="Tangent Line", color="purple", linestyle="-")
         plt.scatter(test_intersection_point[0], test_intersection_point[1], label="Test Intersection Point", color="yellow")  
+        plt.scatter(spline_start[0], spline_start[1], label="Spline Start", color="pink")
+        plt.scatter(spline_end[0], spline_end[1], label="Spline End", color="black")
         plt.title("Original Spline and Laser Beam in Global Frame")
         plt.xlabel("x (global frame)")
         plt.ylabel("y (global frame)")
@@ -247,6 +255,8 @@ class SplineLaserPredictor:
         plt.scatter(predicted_distance, 0, color="red", label="Intersection Point", zorder=5)
         plt.scatter(transformed_points[:, 0], transformed_points[:, 1], color="green", label="Transformed Control Points")
         plt.scatter(test_rotated_intersection_point[0], test_rotated_intersection_point[1], label="Test Intersection Point", color="yellow")  
+        # plt.scatter(spline_start_rot[0], spline_start_rot[1], label="Spline Start", color="pink")
+        # plt.scatter(spline_end_rot[0], spline_end_rot[1], label="Spline End", color="black")
         plt.axhline(0, color="gray", linestyle=":", linewidth=0.5)
         plt.title("Transformed Spline and Laser Beam in Local Frame")
         plt.xlabel("x (local frame)")
@@ -306,9 +316,11 @@ def main(args=None):
     laser_angle = 2.7405292607843876  # Laser beam angle (in radians)
     # laser_angle = 3.5405292607843876- 2 * np.pi  # Laser beam angle (in radians)
     # laser_angle = -3.1405292607843876  # behaves wierd
-    # laser_angle = -3.8405292607843876  #Still acceptable
-    laser_angle = -2.7405292607843876  # Wierd
+    # laser_angle = -3.8405292607843876  # Still acceptable
+    # laser_angle = -2.7405292607843876  # Wierd
     # laser_angle = -2.5405292607843876
+    
+    laser_angle = 215 * np.pi / 180
     
     control_points = np.array([
         [-2.14050467,  2.01223198],

@@ -111,11 +111,13 @@ class BSplineFitter:
             for i in range(num_basis):
                 coeff = np.zeros(num_basis)
                 coeff[i] = 1
+                # print("Basis function\n")
                 basis_function = BSpline(knots, coeff, degree)
+                # print(basis_function)
                 B[:, i] = basis_function(t)
             
-            # print("Collocation Matrix (B):\n")
-            # print(B)
+            print("Collocation Matrix (B):\n")
+            print(B)
 
             B_pseudoinverse = np.linalg.pinv(B)  # Use pseudoinverse directly
             reversed_control_points = B_pseudoinverse @ np.column_stack((x_noisy, y_noisy))
@@ -312,8 +314,8 @@ class BSplineFitter:
 def main():
     lidar_segments = [
         # np.array([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]),  # Example straight segment
-        # np.array([[0, 0], [1, 0] ]),  # Example straight segment
-        np.array([[0, 0], [0.8, 0] ]), # Gives an error
+        np.array([[0, 0], [1, 0] ]),  # Example straight segment
+        # np.array([[0, 0], [0.8, 0] ]), # Gives an error
         np.array([[4, 0], [4.5, 0.2], [5.5, 0.9], [5.9, 1.5], [6, 2]])  # Example curved segment
     ]
 

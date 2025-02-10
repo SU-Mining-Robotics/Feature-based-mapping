@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
 from Test_scipts.Observation_model import SplineLaserPredictor
 from Spline_map_visualiser import SplineMapVisualiser
+from scipy.interpolate import BSpline
 
 
 
@@ -218,6 +219,11 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
                 #Predict mesaurement
                 z_bar = predict_measurement(xEst, entry, x_coordinates, y_coordinates)
                 
+                # Jacobian of the observation model
+                # H = calc_observation_jacobian(xEst, landmark_id)
+                B = calculate_basis_functions(0.0, feature_size_vector[-1], degree = 3)
+                
+              
                 z = 0 #placeholder
                 
                 # plt.scatter(x_coordinates, y_coordinates)
@@ -230,13 +236,8 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
             # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
             print(f"Matrix ID: {matrix_id} is a placeholder.")
             
-    visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-    visualiser.plot_splines()
-
-            
-    # plt.plot(xEst[0], xEst[1], '.r')
-    # plt.draw()
-    # plt.pause(0.01)  # Pause to update the plot
+    # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+    # visualiser.plot_splines()
 
     return xEst, PEst
     
@@ -533,15 +534,42 @@ def predict_measurement(xEst, entry, x_coordinates, y_coordinates):
     
     # # Initialize the predictor
     predictor = SplineLaserPredictor(control_points.T, tau_p, pose)
-    z = predictor.predict_distances(tau_p_list, pose, control_points.T)
+    z , t_stars= predictor.predict_distances(tau_p_list, pose, control_points.T)
     print(f"Predicted measurements: {z}")
-    # predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
+    predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
     
     # print(f"Predicted measurements: {z}")
     # predictor.visualize_prediction()
     
     return 0
-    
+
+def calculate_basis_functions(t_star, num_points, degree = 3):
+        """Calculate the collocation matrix B for the B-spline."""
+        
+        t = t_star
+        n = num_points
+        p = degree
+        
+        # Generate an open uniform knot vector
+        knots = np.concatenate(([0] * (p + 1), np.linspace(0, 1, n - p), [1] * (p + 1)))
+
+
+        # Evaluate basis functions for all t
+        num_basis = len(knots) - degree - 1
+        B = np.zeros((num_points, num_basis))
+        for i in range(num_basis):
+            coeff = np.zeros(num_basis)
+            coeff[i] = 1
+            # print("Basis function\n")
+            basis_function = BSpline(knots, coeff, degree)
+            # print(basis_function)
+            B[:, i] = basis_function(t)
+        
+        print("Collocation Matrix (B):\n")
+        print(B)
+
+        return B
+
     
 def main(args=None):
     rclpy.init(args=args)
