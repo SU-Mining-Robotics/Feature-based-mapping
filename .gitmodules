@@ -1,0 +1,3 @@
+[submodule "my_bot"]
+	path = my_bot
+	url = https://github.com/Delport121/my_bot.git
