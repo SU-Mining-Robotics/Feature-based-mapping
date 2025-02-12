@@ -1,3 +1,6 @@
 [submodule "my_bot"]
 	path = my_bot
 	url = https://github.com/Delport121/my_bot.git
+[submodule "octomap_server2"]
+	path = octomap_server2
+	url = https://github.com/iKrishneel/octomap_server2.git

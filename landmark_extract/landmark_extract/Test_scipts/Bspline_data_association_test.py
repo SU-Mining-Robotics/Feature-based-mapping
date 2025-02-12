@@ -251,8 +251,9 @@ if __name__ == "__main__":
     ]
 
     x_offset = -0.5
+    # x_offset = 0.9
     y_offset = -0.2
-    y_offset = -0.8
+    y_offset = -0.9
     obs_points = [
         # np.array([[0.5, 1.5, 2.5], [0.5, 0.5, -0.5]]),  # Spline 1
         # np.array([[2.5, 3.5, 4.5], [1.5, 1.5, 0.5]]),    # Spline 2

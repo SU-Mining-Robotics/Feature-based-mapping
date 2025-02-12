@@ -144,7 +144,7 @@ class myNode(Node):
 		# # Visualisation
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
-		# self.plot_segments_continous()
+		self.plot_segments_continous()
   
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []

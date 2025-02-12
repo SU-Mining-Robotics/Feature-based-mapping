@@ -39,10 +39,17 @@ class SplineMapVisualiser:
     def plot_splines(self):
         """Visualize the robot pose and spline features."""
         plt.figure(figsize=(8, 6))
+       
+        # Plot robot pose as an arrow
+        plt.quiver(
+            self.robot_pose[0], self.robot_pose[1], 
+            np.cos(self.robot_pose[2]), 
+            np.sin(self.robot_pose[2]), 
+            angles='xy', scale_units='xy', scale=1, 
+            color='r', width=0.01, label="Robot"
+            )
         
-        # Plot robot pose
-        plt.plot(self.robot_pose[0], self.robot_pose[1], 'ro', markersize=8, label='Robot')
-        
+
         # Plot splines
         t_values = np.linspace(0, 1, 100)
         for i, control_points in enumerate(self.features):

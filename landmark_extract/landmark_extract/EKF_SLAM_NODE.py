@@ -13,11 +13,9 @@ import json
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
 from Test_scipts.Observation_model import SplineLaserPredictor
+from Test_scipts.Bspline_data_association_test import SplineDataAssociation
 from Spline_map_visualiser import SplineMapVisualiser
 from scipy.interpolate import BSpline
-
-
-
 import time
 import sys
 import os
@@ -29,16 +27,16 @@ sys.path.append(script_dir)
 
 # EKF state covariance
 M = np.diag([0.5, 0.5, np.deg2rad(30.0)]) ** 2
+M = np.diag([0.5]) 
+
 # EKF measurement covariance of a single lidar beam
 R = np.diag([0.1, np.deg2rad(1.0)]) ** 2
-
-q = 1
-R_new = block_diag(*[R] * (q + 1))
-print(f"R_new shape: {R_new.shape}")
 
 STATE_SIZE = 3  # State size [x, y, yaw]
 LM_SIZE = 2  # Landmark size [x, y]
 
+predictor = SplineLaserPredictor()
+data_associator = SplineDataAssociation()
 
 class EKF_SLAM(Node):  # MODIFY NAME
     def __init__(self):
@@ -70,6 +68,7 @@ class EKF_SLAM(Node):  # MODIFY NAME
         self.odometry_data = np.array([0.0, 0.0, 0.0])
         self.measurement_data = []
         self.feature_size_vector = []
+        self.current_landmark_ids = -1
         
         self.get_logger().info('EKF SLAM node has been initialized.')
 
@@ -144,10 +143,10 @@ class EKF_SLAM(Node):  # MODIFY NAME
             
             
         if self.EKF_test == True:
-            self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector)
+            self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector, self.current_landmark_ids)
             self.EKF_test = False
             
-        self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector)
+        self.xEst, self.PEst = EKF_SLAM_step(self.xEst, self.PEst, self.odometry_data, self.measurement_data, self.feature_size_vector, self.current_landmark_ids)
         
     def matrixCB(self, msg):
         # Deserialize the JSON data
@@ -180,7 +179,7 @@ class EKF_SLAM(Node):  # MODIFY NAME
             
         self.range_bearing_recieved_flag = True
 
-def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
+def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
     '''
     Main EKF SLAM algorithm
     '''
@@ -191,6 +190,8 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
     # print(f"Predicted state: {xEst}")
     # print(f"Predicted covariance: {PEst}")
     
+    
+    
     #Intermediate matrices to store the predicted state and covariance matrix
     xPredicted = xEst
     pPredicted = PEst
@@ -200,38 +201,82 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector):
         matrix_id = entry.get('id')
         rows = entry.get('rows')
         cols = entry.get('cols')
+        range_bearing_data = np.array(entry.get('range_bearing_data', []))
+        
+        #Process if valid feature
         if rows > 0 and cols > 0:
-            #Process if valid feature
+            
             # landmark_id = search_correspond_LM_ID(xEst, PEst, entry)
             new_landmark = True
             
+            # Get landmark positions
+            
+            # for each feature in map
+                # Get map landmark popsition
+                # Check for for association
+            
+            # If association, set ID to corresponding landmark
+            # If no association, add new landmark
+            
             if new_landmark is True:
                 print("New LM")
-                x_coordinates, y_coordinates, feature_size_vector = calc_landmark_positions(xEst, entry, feature_size_vector)
+                current_landmark_id = len(feature_size_vector) #Number of landmark +1
+                x_coordinates, y_coordinates, feature_data_size = calc_landmark_positions(xEst, entry)
+                feature_size_vector.append(feature_data_size)
                
-                # PAug = calc_augmented_covariance(xEst, PEst, entry) # Need to fix R
-                xEst = np.hstack((xEst, x_coordinates, y_coordinates))
+                PAug = calc_augmented_covariance(xEst, PEst, entry) # Need to fix R
+                xAug = np.hstack((xEst, x_coordinates, y_coordinates))
+                xEst = xAug
+                PEst = PAug
                 
-                print(f"xEst shape: {xEst}")
-                print(f'feature_size_vector shape: {feature_size_vector}')
-                
+            #Predict measurement
+            z_bar_list, tau_p_list, t_star_list, spline_tangents_list = predict_measurement(xEst, entry, feature_size_vector, current_landmark_id)
+            H = calculate_measurement_jacobian(z_bar_list, tau_p_list, t_star_list, spline_tangents_list, feature_size_vector, current_landmark_id)
+            # print(f"H shape: {H.shape}")
+            # print(f"PEst shape: {PEst.shape}")
+            
+            # Extract range
+            y = range_bearing_data[:, 0] - z_bar_list 
+            # print(f"Ranges: {ranges}")
+            # print(f"Ranges shape: {ranges.shape}")
+            # print(f"Z_bar: {z_bar_list}")
+            # print(f"Z_bar shape: {z_bar_list.shape}")
+            # print(f"y: {y}")
+            # print(f"y shape: {y.shape}")
+      
+            S = H @ PEst @ H.T # + R_new
+            K = (PEst @ H.T) @ np.linalg.inv(S)
+            
+            print(f'xEst: {xEst}')
+            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            visualiser.plot_splines()
+            
+            xEst = xEst + (K @ y)
+            
+            print(f'xEst: {xEst}')
+            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            visualiser.plot_splines()
+            
+            PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
+            
+            
+          
                
-                #Predict mesaurement
-                z_bar = predict_measurement(xEst, entry, x_coordinates, y_coordinates)
-                
-                # Jacobian of the observation model
-                # H = calc_observation_jacobian(xEst, landmark_id)
-                B = calculate_basis_functions(0.0, feature_size_vector[-1], degree = 3)
-                
-              
-                z = 0 #placeholder
-                
-                # plt.scatter(x_coordinates, y_coordinates)
-                # plt.show()
-                
-                
-                xEst = xEst
-                # PEst = PAug
+                    
+            # Jacobian of the observation model
+            # H = calc_observation_jacobian(xEst, landmark_id)
+            # B = calculate_basis_functions(0.0, feature_size_vector[-1], degree = 3)
+            # print(f"B shape: {B.shape}")
+            
+            
+            z = 0 #placeholder
+            
+            # plt.scatter(x_coordinates, y_coordinates)
+            # plt.show()
+            
+            
+            xEst = xEst
+            # PEst = PAug
         else:
             # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
             print(f"Matrix ID: {matrix_id} is a placeholder.")
@@ -326,7 +371,7 @@ def search_correspond_LM_ID(xEst, PEst, z):
     
     return True
 
-def calc_landmark_positions(xEst, entry, feature_size_vector):
+def calc_landmark_positions(xEst, entry):
     
     # Extract robot pose
     x_r = xEst[0]  # Robot's x position
@@ -388,15 +433,14 @@ def calc_landmark_positions(xEst, entry, feature_size_vector):
     #Get number of rows and columns
     rows = len(transformed_x_coordinates)
     feature_data_size = rows 
-    feature_size_vector.append(feature_data_size)
-    
-    return transformed_x_coordinates, transformed_y_coordinates, feature_size_vector
+   
+    return transformed_x_coordinates, transformed_y_coordinates, feature_data_size
 
 def calc_augmented_covariance(xEst, PEst, entry):
     # Extract robot pose
-    x_r = xEst[0]  # Robot's x position
-    y_r = xEst[1]  # Robot's y position
-    phi_r = xEst[2]  # Robot's orientation (yaw)
+    x_r = xEst[0] 
+    y_r = xEst[1]
+    phi_r = xEst[2]  
     
     # Extract the transformation matrix Φ from the entry
     matrix_id = entry.get('id')
@@ -474,101 +518,121 @@ def calc_augmented_covariance(xEst, PEst, entry):
 
     #Calculating G_z
     G_z = np.vstack((np.zeros((xEst.shape[0], dgs_dz.shape[1])), dgs_dz))
-    # print(f"G_z shape: {G_z.shape}")
-   
-    # G_x = None
+
+    # Expand M to fit the size of the augmented state vector
+    size = G_z.shape[1]
+    M = np.diag([0.5] * size)
     
-    # G_z = None
     print(f"G_x shape: {G_x.shape}")
     print(f"PEst shape: {PEst.shape}")
-    
     print(f"G_z shape: {G_z.shape}")
     print(f"M shape: {M.shape}")
- 
-    
     
     First = G_x @ PEst @ G_x.T
-    print(f'Gx', G_x)
-    print(f'PEst', PEst)
-    print(f'Gx.T', G_x.T)
-    print(f"gx @ PEst", G_x @ PEst)
-    print(f"First:", First)
-    print(f"First shape: {First.shape}")
-    # Second = G_z @ M @ G_z.T
+    Second = G_z @ M @ G_z.T
+    PAug = First #+ Second
     # PAug = G_x @ PEst @ G_x.T + G_z @ M @ G_z.T
-    PAug = First
+    print(f"First shape: {First.shape}")
+    print(f"Second shape: {Second.shape}")
+    print(f"PAug shape: {PAug.shape}")
     
     return PAug
    
-def predict_measurement(xEst, entry, x_coordinates, y_coordinates):
+def predict_measurement(xEst, entry, feature_size_vector, landmark_id):
+    
     # Extract robot pose
-    x_r = xEst[0]  # Robot's x position
-    y_r = xEst[1]  # Robot's y position
-    phi_r = xEst[2]  # Robot's orientation (yaw)
+    x_r = xEst[0] 
+    y_r = xEst[1]  
+    phi_r = xEst[2]  
     pose = np.array([x_r, y_r, phi_r])
     
+    # Extract landmark control points
+    feature_size = feature_size_vector[landmark_id]
+    n = 2 * np.sum(feature_size_vector[:landmark_id]) 
+    x_coordinates = xEst[int(n+STATE_SIZE):int(n+STATE_SIZE+feature_size)]
+    y_coordinates = xEst[int(n+STATE_SIZE+feature_size):int(n+STATE_SIZE+2*feature_size)]
     control_points = np.array([x_coordinates, y_coordinates])
     
-    # Extract range and bearing data
-    range_bearing_data = np.array(entry.get('range_bearing_data', []))
+    # Extract the angles relevant to the current spline
+    range_bearing_data = np.array(entry.get('range_bearing_data', []))   
+    tau_p_list = range_bearing_data[:, 1]
+    z , t_stars, tangent_angles = predictor.predict_distances(tau_p_list, pose, control_points.T)
     
-    tau_p_list = []
-    for data in range_bearing_data:
-        tau_p = data[1]
-        tau_p_list.append(tau_p) 
-    
-    
-    print("f.tau_p_list", tau_p_list)
-    # z = []
-    
-    # for data in range_bearing_data:
-    #     z_p = data[0]  # Range to the landmark
-    #     tau_p = data[1]  # Bearing to the landmark
-    
-    
-    # # Extraxt control points (landmarks)
-   
-    # print(f"Robot pose: {pose}")
-    # print(f"Bearing", tau_p)
-    # print(f"Control_points", control_points.T)
-    
-    # # Initialize the predictor
-    predictor = SplineLaserPredictor(control_points.T, tau_p, pose)
-    z , t_stars= predictor.predict_distances(tau_p_list, pose, control_points.T)
-    print(f"Predicted measurements: {z}")
-    predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
-    
+    #Visualise imformation
+    # print("f.tau_p_list", tau_p_list)
     # print(f"Predicted measurements: {z}")
-    # predictor.visualize_prediction()
+    # predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
     
-    return 0
+    return z, tau_p_list, t_stars, tangent_angles
 
-def calculate_basis_functions(t_star, num_points, degree = 3):
-        """Calculate the collocation matrix B for the B-spline."""
+def calculate_measurement_jacobian(z_bar_list, tau_p_list, t_star_list, spline_tangents_list, feature_size_vector, landmark_id):
+    
+    H = None
+    feature_size = feature_size_vector[landmark_id]
+    n = 2 * np.sum(feature_size_vector[:landmark_id])  # Sum of values' components before landmark_id
+    p = 2 * np.sum(feature_size_vector[landmark_id+1:]) 
+    # print(f"tau_p_list:\n {len(tau_p_list)}")
+    # print(f"t_star_list:\n {len(t_star_list)}")
+    # print(f"T_star:\n {t_star_list}") #First t_start is wierd
+    
+    for tau_p, t_star, tangent_angle, z_bar in zip(tau_p_list, t_star_list, spline_tangents_list, z_bar_list):
         
-        t = t_star
-        n = num_points
-        p = degree
+        basis_vector_at_t_star = calculate_basis_functions(t_star, feature_size-1, degree = 3)
+        # print(f"Basis vector at t_star:\n {basis_vector_at_t_star}")
+        h_xi_vec = basis_vector_at_t_star * (np.cos(tau_p) + np.sin(tau_p)/np.tan(tangent_angle-tau_p))
+        h_yi_vec = basis_vector_at_t_star * (np.sin(tau_p) - np.cos(tau_p)/np.tan(tangent_angle-tau_p))
+        # print(f"h_xi_vec:\n {h_xi_vec}")
+        # print(f"h_yi_vec shape:\n {h_xi_vec.shape}")
         
-        # Generate an open uniform knot vector
-        knots = np.concatenate(([0] * (p + 1), np.linspace(0, 1, n - p), [1] * (p + 1)))
-
-
-        # Evaluate basis functions for all t
-        num_basis = len(knots) - degree - 1
-        B = np.zeros((num_points, num_basis))
-        for i in range(num_basis):
-            coeff = np.zeros(num_basis)
-            coeff[i] = 1
-            # print("Basis function\n")
-            basis_function = BSpline(knots, coeff, degree)
-            # print(basis_function)
-            B[:, i] = basis_function(t)
+        h_xr = -np.cos(tau_p) - np.sin(tau_p)/np.tan(tangent_angle-tau_p)
+        h_yr = -np.sin(tau_p) + np.cos(tau_p)/np.tan(tangent_angle-tau_p)
+        h_phi_r = z_bar/np.tan(tangent_angle-tau_p)
         
-        print("Collocation Matrix (B):\n")
-        print(B)
+        # Construct a row in jocobian matrix
+        H_row = np.hstack([
+            h_xr, h_yr, h_phi_r, 
+            *( [np.zeros(n)] if n > 0 else [] ),
+            h_xi_vec, h_yi_vec, 
+            *( [np.zeros(p)] if p > 0 else [] )
+        ])
+        # print(f"H_row:\n {H_row}")
+        # print(f"H_row shape: {H_row.shape}")
+        
+        if H is not None:
+            H = np.vstack([H, H_row]) 
+        else:
+            H = H_row
+        
+    # print(f"H:\n {H}")
+    # print(f"H shape: {H.shape}")
+    
+    return H
+    
+def calculate_basis_functions(t_star, num_points, degree=3):
+    """Calculate the basis function values at a single point t_star."""
+    
+    n = num_points
+    p = degree
 
-        return B
+    # Generate an open uniform knot vector
+    knots = np.concatenate(([0] * (p + 1), np.linspace(0, 1, n - p), [1] * (p + 1)))
+
+    # Number of basis functions
+    num_basis = len(knots) - degree - 1
+
+    # Compute the basis function values at t_star
+    B = np.zeros(num_basis)
+    for i in range(num_basis):
+        coeff = np.zeros(num_basis)
+        coeff[i] = 1
+        basis_function = BSpline(knots, coeff, degree)
+        B[i] = basis_function(t_star)  # Evaluate at single t_star
+    
+    print(B)
+    print(f"B shape: {B.shape}")    
+
+    return B  # Returns a 1D array (single row)
+
 
     
 def main(args=None):

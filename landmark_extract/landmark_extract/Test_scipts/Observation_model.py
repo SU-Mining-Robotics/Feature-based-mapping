@@ -145,6 +145,7 @@ class SplineLaserPredictor:
         """
         distances = []
         t_stars = []
+        tangent_angles = []
 
         for angle in angles:
             # Update the robot pose and control points for this calculation
@@ -162,12 +163,15 @@ class SplineLaserPredictor:
             # Try multiple initial guesses for t
             initial_guesses = np.linspace(0.5, 1, 10) # Customize the range and number of guesses
             predicted_distance = 0.0  # Default value if no solution is found
+            tangent_angle = 0.0
+            t_star = 0.0
             for t_initial in initial_guesses:
                 try:
                     t_star = newton(sy_root, t_initial)  # Use Newton-Raphson to find the root
                     # Ensure t_star is within the valid range [0, 1]
                     if 0 <= t_star <= 1:
                         predicted_distance = self.spline_function(transformed_points, t_star)[0]
+                        tangent_angle = self.compute_tangent_angle(t_star)  # Tangent angle at t_star
                         break
                 except RuntimeError:
                     continue  # Try the next initial guess
@@ -189,8 +193,9 @@ class SplineLaserPredictor:
             # Append the result for this angle
             distances.append(predicted_distance)
             t_stars.append(t_star)
+            tangent_angles.append(tangent_angle)
 
-        return np.array(distances), np.array(t_stars)
+        return np.array(distances), np.array(t_stars), np.array(tangent_angles)
 
 
 
@@ -277,7 +282,7 @@ class SplineLaserPredictor:
             control_points (array-like): Control points of the spline curve.
         """
         # Predict distances for all angles
-        distances = self.predict_distances(angles, robot_pose, control_points)
+        distances, t_stars, tangent_angles = self.predict_distances(angles, robot_pose, control_points)
 
         # Generate the original spline points
         t_values = np.linspace(0, 1, 100)
@@ -303,6 +308,7 @@ class SplineLaserPredictor:
         plt.grid(True)
         plt.axis("equal")
         plt.show()
+
 
 
 def main(args=None):
@@ -334,7 +340,10 @@ def main(args=None):
         [-2.1909611,  -1.9891872]
     ])
 
-    predictor = SplineLaserPredictor(control_points, laser_angle, robot_pose)
+    predictor = SplineLaserPredictor()
+    predictor.set_control_points(control_points)
+    predictor.set_laser_angle(laser_angle)
+    predictor.set_robot_pose(robot_pose)
     predictor.visualize_prediction()
 
 if __name__ == "__main__":

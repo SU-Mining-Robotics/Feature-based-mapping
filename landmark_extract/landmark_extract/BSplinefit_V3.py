@@ -116,8 +116,8 @@ class BSplineFitter:
                 # print(basis_function)
                 B[:, i] = basis_function(t)
             
-            print("Collocation Matrix (B):\n")
-            print(B)
+            # print("Collocation Matrix (B):\n")
+            # print(B)
 
             B_pseudoinverse = np.linalg.pinv(B)  # Use pseudoinverse directly
             reversed_control_points = B_pseudoinverse @ np.column_stack((x_noisy, y_noisy))
