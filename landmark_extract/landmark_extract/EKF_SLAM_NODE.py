@@ -206,17 +206,7 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
         #Process if valid feature
         if rows > 0 and cols > 0:
             
-            # landmark_id = search_correspond_LM_ID(xEst, PEst, entry)
-            new_landmark = True
-            
-            # Get landmark positions
-            
-            # for each feature in map
-                # Get map landmark popsition
-                # Check for for association
-            
-            # If association, set ID to corresponding landmark
-            # If no association, add new landmark
+            current_landmark_id, new_landmark= search_correspond_LM_ID(xEst, entry, feature_size_vector) #Checks for data association
             
             if new_landmark is True:
                 print("New LM")
@@ -235,29 +225,29 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             # print(f"H shape: {H.shape}")
             # print(f"PEst shape: {PEst.shape}")
             
-            # Extract range
-            y = range_bearing_data[:, 0] - z_bar_list 
-            # print(f"Ranges: {ranges}")
-            # print(f"Ranges shape: {ranges.shape}")
-            # print(f"Z_bar: {z_bar_list}")
-            # print(f"Z_bar shape: {z_bar_list.shape}")
-            # print(f"y: {y}")
-            # print(f"y shape: {y.shape}")
+            # # Extract range
+            # y = range_bearing_data[:, 0] - z_bar_list 
+            # # print(f"Ranges: {ranges}")
+            # # print(f"Ranges shape: {ranges.shape}")
+            # # print(f"Z_bar: {z_bar_list}")
+            # # print(f"Z_bar shape: {z_bar_list.shape}")
+            # # print(f"y: {y}")
+            # # print(f"y shape: {y.shape}")
       
-            S = H @ PEst @ H.T # + R_new
-            K = (PEst @ H.T) @ np.linalg.inv(S)
+            # S = H @ PEst @ H.T # + R_new
+            # K = (PEst @ H.T) @ np.linalg.inv(S)
             
-            print(f'xEst: {xEst}')
-            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-            visualiser.plot_splines()
+            # print(f'xEst: {xEst}')
+            # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            # visualiser.plot_splines()
             
-            xEst = xEst + (K @ y)
+            # xEst = xEst + (K @ y)
             
-            print(f'xEst: {xEst}')
-            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-            visualiser.plot_splines()
+            # print(f'xEst: {xEst}')
+            # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            # visualiser.plot_splines()
             
-            PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
+            # PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
             
             
           
@@ -269,7 +259,7 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             # print(f"B shape: {B.shape}")
             
             
-            z = 0 #placeholder
+            print(f"Number of landmarks: {len(feature_size_vector)}")
             
             # plt.scatter(x_coordinates, y_coordinates)
             # plt.show()
@@ -281,8 +271,8 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
             print(f"Matrix ID: {matrix_id} is a placeholder.")
             
-    # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-    # visualiser.plot_splines()
+    visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+    visualiser.plot_splines()
 
     return xEst, PEst
     
@@ -367,10 +357,37 @@ def calc_n_lm(x):
     n = int((len(x) - STATE_SIZE) / LM_SIZE)
     return n
 
-def search_correspond_LM_ID(xEst, PEst, z):
+def search_correspond_LM_ID(xEst, entry, feature_size_vector):
     
-    return True
-
+    current_landmark_id = -1
+    new_landmark = True
+    
+    # Get landmark positions
+    x_coordinates, y_coordinates, feature_data_size = calc_landmark_positions(xEst, entry)
+    observation = [np.array([x_coordinates, y_coordinates])] # Format is a bit wierd due to how association method is implemented
+    
+    #Iterate through landmarks in map
+    for landmark_id, feature_size in enumerate(feature_size_vector): 
+        n = 2 * np.sum(feature_size_vector[:landmark_id])  # Sum of values' components before landmark_id
+        x_values = xEst[int(n+STATE_SIZE):int(n+STATE_SIZE+feature_size)]
+        y_values = xEst[int(n+STATE_SIZE+feature_size):int(n+STATE_SIZE+2*feature_size)]
+        map_points = [] 
+        map_points.append(np.array([x_values, y_values]))  # Format is a bit wierd due to how association method is implemented
+        
+        # Check for association
+        matched = data_associator.process(map_points, observation)
+        
+        if matched is True:
+            new_landmark = False
+            current_landmark_id = landmark_id
+            break
+        else:
+            new_landmark = True
+            current_landmark_id = -1
+            continue
+        
+    return current_landmark_id, new_landmark
+    
 def calc_landmark_positions(xEst, entry):
     
     # Extract robot pose
@@ -396,7 +413,7 @@ def calc_landmark_positions(xEst, entry):
 
     # Extract range and bearing data
     range_bearing_data = np.array(entry.get('range_bearing_data', []))
-    print(f"Range-bearing data: {range_bearing_data}")  
+    # print(f"Range-bearing data: {range_bearing_data}")  
 
     # Initialize lists for landmark coordinates
     x_landmarks = []
@@ -426,9 +443,9 @@ def calc_landmark_positions(xEst, entry):
     transformed_x_coordinates = phi_matrix @ x_coordinates
     transformed_y_coordinates = phi_matrix @ y_coordinates
     #Print transformed x-coordinates shape
-    print(f"Transformed x-coordinates shape: {transformed_x_coordinates.shape}")
+    # print(f"Transformed x-coordinates shape: {transformed_x_coordinates.shape}")
     #Print transformed y-coordinates shape
-    print(f"Transformed y-coordinates shape: {transformed_y_coordinates.shape}")
+    # print(f"Transformed y-coordinates shape: {transformed_y_coordinates.shape}")
     
     #Get number of rows and columns
     rows = len(transformed_x_coordinates)
@@ -500,7 +517,7 @@ def calc_augmented_covariance(xEst, PEst, entry):
     bottom_diag_matrix = np.diag(bottom_diag_list)
     # print(f"Bottom diag matrix shape: {bottom_diag_matrix.shape}")
     dgs_dz = np.vstack(((phi_matrix @ top_diag_matrix), (phi_matrix @ bottom_diag_matrix)))
-    print(f"DGs/Dz shape: {dgs_dz.shape}")
+    # print(f"DGs/Dz shape: {dgs_dz.shape}")
         
     # Jacobians
     # Calculating G_x
@@ -523,18 +540,18 @@ def calc_augmented_covariance(xEst, PEst, entry):
     size = G_z.shape[1]
     M = np.diag([0.5] * size)
     
-    print(f"G_x shape: {G_x.shape}")
-    print(f"PEst shape: {PEst.shape}")
-    print(f"G_z shape: {G_z.shape}")
-    print(f"M shape: {M.shape}")
+    # print(f"G_x shape: {G_x.shape}")
+    # print(f"PEst shape: {PEst.shape}")
+    # print(f"G_z shape: {G_z.shape}")
+    # print(f"M shape: {M.shape}")
     
     First = G_x @ PEst @ G_x.T
     Second = G_z @ M @ G_z.T
     PAug = First #+ Second
     # PAug = G_x @ PEst @ G_x.T + G_z @ M @ G_z.T
-    print(f"First shape: {First.shape}")
-    print(f"Second shape: {Second.shape}")
-    print(f"PAug shape: {PAug.shape}")
+    # print(f"First shape: {First.shape}")
+    # print(f"Second shape: {Second.shape}")
+    # print(f"PAug shape: {PAug.shape}")
     
     return PAug
    
@@ -628,8 +645,8 @@ def calculate_basis_functions(t_star, num_points, degree=3):
         basis_function = BSpline(knots, coeff, degree)
         B[i] = basis_function(t_star)  # Evaluate at single t_star
     
-    print(B)
-    print(f"B shape: {B.shape}")    
+    # print(B)
+    # print(f"B shape: {B.shape}")    
 
     return B  # Returns a 1D array (single row)
 

@@ -116,9 +116,11 @@ class SplineDataAssociation:
                     print("t_ini:", t_ini)
                     print("u_fin:", u_fin)
                     print("t_fin:", t_fin)
-                 
+
+                    Matched = False
                     if distance < d_match and (t_fin > t_ini) and (u_fin > u_ini):
                         print("Matched")
+                        Matched = True
                         # print("Matched")
                         # print("Distance2:", distance)
                         # print("u_ini:", u_ini)
@@ -131,55 +133,57 @@ class SplineDataAssociation:
                         # print("u_fin:", u_fin)
                         # print("t_fin:", t_fin)
                         
-                        plt.figure(figsize=(10, 8))
-                        # Plot map splines and control points
-                        u = np.linspace(0, 1, 100)
-                        x, y = splev(u, map_tck)
-                        plt.plot(x, y, label="Map Spline", color="blue")
-                        map_cp = np.vstack(map_tck[1]).T
-                        plt.scatter(map_cp[:, 0], map_cp[:, 1], color="blue", marker='o', label="Map Control Points")
                         
-                        # Plot observed splines and control points
-                        u = np.linspace(0, 1, 100)
-                        x, y = splev(u, obs_tck)
-                        plt.plot(x, y, label="Observed Spline", color="green")
-                        obs_cp = np.vstack(obs_tck[1]).T
-                        plt.scatter(obs_cp[:, 0], obs_cp[:, 1], color="green", marker='x', label="Obs Control Points")
+                        ## Plot the splines for comparison
+                        # plt.figure(figsize=(10, 8))
+                        # # Plot map splines and control points
+                        # u = np.linspace(0, 1, 100)
+                        # x, y = splev(u, map_tck)
+                        # plt.plot(x, y, label="Map Spline", color="blue")
+                        # map_cp = np.vstack(map_tck[1]).T
+                        # plt.scatter(map_cp[:, 0], map_cp[:, 1], color="blue", marker='o', label="Map Control Points")
                         
-                        # Plot points
-                        x_obs, y_obs = splev(u_ini, obs_tck)
-                        plt.scatter(x_obs, y_obs, color="red", marker='o', label="Initial Observed Point")
-                        x_map, y_map = splev(t_ini, map_tck)
-                        plt.scatter(x_map, y_map, color="red", marker='x', label="Initial Map Point")
+                        # # Plot observed splines and control points
+                        # u = np.linspace(0, 1, 100)
+                        # x, y = splev(u, obs_tck)
+                        # plt.plot(x, y, label="Observed Spline", color="green")
+                        # obs_cp = np.vstack(obs_tck[1]).T
+                        # plt.scatter(obs_cp[:, 0], obs_cp[:, 1], color="green", marker='x', label="Obs Control Points")
                         
-                        # Plot points
-                        x_obs, y_obs = splev(u_fin, obs_tck)
-                        plt.scatter(x_obs, y_obs, color="black", marker='o', label="Final Observed Point")
-                        x_map, y_map = splev(t_fin, map_tck)
-                        plt.scatter(x_map, y_map, color="black", marker='x', label="Final Map Point")
+                        # # Plot points
+                        # x_obs, y_obs = splev(u_ini, obs_tck)
+                        # plt.scatter(x_obs, y_obs, color="red", marker='o', label="Initial Observed Point")
+                        # x_map, y_map = splev(t_ini, map_tck)
+                        # plt.scatter(x_map, y_map, color="red", marker='x', label="Initial Map Point")
                         
-                        test_point = t_ini +0.15
-                        print("t_ini:", test_point)  
-                        test_point = x_test, y_test = splev(test_point, map_tck)
-                        plt.scatter(x_test, y_test, color="orange", marker='o', label="Test Point")
+                        # # Plot points
+                        # x_obs, y_obs = splev(u_fin, obs_tck)
+                        # plt.scatter(x_obs, y_obs, color="black", marker='o', label="Final Observed Point")
+                        # x_map, y_map = splev(t_fin, map_tck)
+                        # plt.scatter(x_map, y_map, color="black", marker='x', label="Final Map Point")
+                        
+                        # test_point = t_ini +0.15
+                        # print("t_ini:", test_point)  
+                        # test_point = x_test, y_test = splev(test_point, map_tck)
+                        # plt.scatter(x_test, y_test, color="orange", marker='o', label="Test Point")
                         
                         
                             
                         
-                        plt.legend()
-                        plt.xlabel("X")
-                        plt.ylabel("Y")
-                        plt.title("Spline Data Association with Control Points")
-                        plt.grid()
-                        plt.axis('equal')
-                        plt.show()
+                        # plt.legend()
+                        # plt.xlabel("X")
+                        # plt.ylabel("Y")
+                        # plt.title("Spline Data Association with Control Points")
+                        # plt.grid()
+                        # plt.axis('equal')
+                        # plt.show()
                         
 
-                    # pass
+                    
                     
                 associations.append((obs_tck, map_tck))
 
-        return associations
+        return associations, Matched
 
     def visualize(self, associations):
         """
@@ -235,10 +239,12 @@ class SplineDataAssociation:
         self.obs_splines = [self.generate_spline(points) for points in obs_points]
 
         # Perform data association
-        associations = self.data_association()
+        associations, matched = self.data_association()
 
         # Visualize the results
         # self.visualize(associations)
+        
+        return matched
 
 
 if __name__ == "__main__":
@@ -249,6 +255,8 @@ if __name__ == "__main__":
         # np.array([[0, 1, 2, 3], [0, 1, 0, -1]])
          np.array([[0, 1, 4, 4.5, 6.5 , 7], [0, 0.5, 1.0, 0.8, 0.8, 0.9]])
     ]
+    print(map_points)
+    print(map_points[0].shape)
 
     x_offset = -0.5
     # x_offset = 0.9
