@@ -222,19 +222,21 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
                 
             #Predict measurement
             z_bar_list, tau_p_list, t_star_list, spline_tangents_list = predict_measurement(xEst, entry, feature_size_vector, current_landmark_id)
-            # Remove edge values
-            z_bar_list = z_bar_list[1:]
-            tau_p_list = tau_p_list[1:]
-            t_star_list = t_star_list[1:]
-            spline_tangents_list = spline_tangents_list[1:]
+            # Remove the front and back values
+            z_bar_list = z_bar_list[1:-1]  
+            tau_p_list = tau_p_list[1:-1]
+            t_star_list = t_star_list[1:-1]
+            spline_tangents_list = spline_tangents_list[1:-1]
             
             H = calculate_measurement_jacobian(z_bar_list, tau_p_list, t_star_list, spline_tangents_list, feature_size_vector, current_landmark_id)
             # print(f"H shape: {H.shape}")
             # print(f"PEst shape: {PEst.shape}")
             
             # # Extract range
-            y = range_bearing_data[:, 0] - z_bar_list 
-            print(f"Ranges: {range_bearing_data[:, 0]}")
+            ranges = range_bearing_data[:, 0]
+            ranges = ranges[1:-1]
+            y = ranges - z_bar_list 
+            print(f"Ranges: {ranges}")
             # print(f"Ranges shape: {ranges.shape}")
             print(f"Z_bar: {z_bar_list}")
             # print(f"Z_bar shape: {z_bar_list.shape}")
@@ -588,7 +590,7 @@ def predict_measurement(xEst, entry, feature_size_vector, landmark_id):
     #Visualise imformation
     # print("f.tau_p_list", tau_p_list)
     # print(f"Predicted measurements: {z}")
-    # predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T)
+    predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T, range_bearing_data[:, 0])
     
     return z, tau_p_list, t_stars, tangent_angles
 

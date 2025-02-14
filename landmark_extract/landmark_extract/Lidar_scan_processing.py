@@ -76,7 +76,7 @@ class myNode(Node):
 		self.angles = angles
   
 		#Cut scan with 1
-		ranges = ranges[:-1] # For F1tenh thcar
+		# ranges = ranges[:-1] # For F1tenh thcar
 		# Check if scan and ranges are the same length
 		if len(ranges) != len(angles):
 			self.get_logger().error("Scan and ranges are not the same length.")
@@ -121,7 +121,7 @@ class myNode(Node):
 		# self.bspline_fitter.calculate_knot_segment_lengths()
 		# self.bspline_fitter.visualize()
 		self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list = self.bspline_fitter.send_results()
-		# self.bspline_fitter.visualize_continues()
+		self.bspline_fitter.visualize_continues()
 		# self.bspline_fitter.fit_bspline_to_lidar(self.scan_segments[3], knot_distance=0.5)
 		# self.bspline_fitter.plot_bspline()
   
@@ -144,7 +144,7 @@ class myNode(Node):
 		# # Visualisation
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
-		self.plot_segments_continous()
+		# self.plot_segments_continous()
   
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []
@@ -472,8 +472,8 @@ class myNode(Node):
 		plt.clf()
   
 		# Plot all points
-		# plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') # Husky
-		plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') #F1tenth
+		plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') # Husky
+		# plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') #F1tenth1
 
 		if self.scan_segments:
 			

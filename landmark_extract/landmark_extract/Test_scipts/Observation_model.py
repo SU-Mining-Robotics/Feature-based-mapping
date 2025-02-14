@@ -221,7 +221,7 @@ class SplineLaserPredictor:
 
         plt.show()
         
-    def visualize_lidar_beams(self, angles, robot_pose, control_points):
+    def visualize_lidar_beams(self, angles, robot_pose, control_points, actual_distances):
         """
         Visualize the spline and lidar beams.
         
@@ -229,6 +229,7 @@ class SplineLaserPredictor:
             angles (array-like): List or array of angles for the laser beams.
             robot_pose (array-like): The pose of the robot [x, y, theta].
             control_points (array-like): Control points of the spline curve.
+            actual_distances (array-like): Actual distances measured by the lidar.
         """
         # Predict distances for all angles
         distances, t_stars, tangent_angles = self.predict_distances(angles, robot_pose, control_points)
@@ -243,12 +244,21 @@ class SplineLaserPredictor:
         plt.scatter(control_points[:, 0], control_points[:, 1], color="green", label="Control Points")
 
         # Plot each lidar beam
-        for angle, distance in zip(angles, distances):
+        for angle, predicted_distance, actual_distance in zip(angles, distances, actual_distances):
             laser_origin = np.array([robot_pose[0], robot_pose[1]])
             laser_direction = np.array([np.cos(angle + robot_pose[2]), np.sin(angle + robot_pose[2])])
-            laser_end = laser_origin + distance * laser_direction
-            plt.plot([laser_origin[0], laser_end[0]], [laser_origin[1], laser_end[1]], 
-                    color="orange", linestyle="--", alpha=0.7)
+            
+            # Actual beam
+            actual_end = laser_origin + actual_distance * laser_direction
+            plt.plot([laser_origin[0], actual_end[0]], [laser_origin[1], actual_end[1]], 
+                     color="red", linestyle="-", linewidth=2, alpha=0.7, marker='o', label="Actual Beam" if angle == angles[0] else "")
+            
+            # Predicted beam
+            predicted_end = laser_origin + predicted_distance * laser_direction
+            plt.plot([laser_origin[0], predicted_end[0]], [laser_origin[1], predicted_end[1]], 
+                     color="orange", linestyle="-", alpha=0.5, marker='x', label="Predicted Beam" if angle == angles[0] else "")
+
+
 
         plt.title("Original Spline and Lidar Beams")
         plt.xlabel("x (global frame)")
