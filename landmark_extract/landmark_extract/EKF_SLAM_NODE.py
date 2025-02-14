@@ -206,7 +206,8 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
         #Process if valid feature
         if rows > 0 and cols > 0:
             
-            current_landmark_id, new_landmark= search_correspond_LM_ID(xEst, entry, feature_size_vector) #Checks for data association
+            current_landmark_id, new_landmark= search_correspond_LM_ID(xEst, entry, feature_size_vector) # Checks for data association
+            # Extend feature if necessary
             
             if new_landmark is True:
                 print("New LM")
@@ -221,33 +222,42 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
                 
             #Predict measurement
             z_bar_list, tau_p_list, t_star_list, spline_tangents_list = predict_measurement(xEst, entry, feature_size_vector, current_landmark_id)
+            # Remove edge values
+            z_bar_list = z_bar_list[1:]
+            tau_p_list = tau_p_list[1:]
+            t_star_list = t_star_list[1:]
+            spline_tangents_list = spline_tangents_list[1:]
+            
             H = calculate_measurement_jacobian(z_bar_list, tau_p_list, t_star_list, spline_tangents_list, feature_size_vector, current_landmark_id)
             # print(f"H shape: {H.shape}")
             # print(f"PEst shape: {PEst.shape}")
             
             # # Extract range
-            # y = range_bearing_data[:, 0] - z_bar_list 
-            # # print(f"Ranges: {ranges}")
-            # # print(f"Ranges shape: {ranges.shape}")
-            # # print(f"Z_bar: {z_bar_list}")
-            # # print(f"Z_bar shape: {z_bar_list.shape}")
-            # # print(f"y: {y}")
-            # # print(f"y shape: {y.shape}")
+            y = range_bearing_data[:, 0] - z_bar_list 
+            print(f"Ranges: {range_bearing_data[:, 0]}")
+            # print(f"Ranges shape: {ranges.shape}")
+            print(f"Z_bar: {z_bar_list}")
+            # print(f"Z_bar shape: {z_bar_list.shape}")
+            print(f"y: {y}")
+            print(f"y shape: {y.shape}")
       
-            # S = H @ PEst @ H.T # + R_new
-            # K = (PEst @ H.T) @ np.linalg.inv(S)
+            S = H @ PEst @ H.T # + R_new
+            K = (PEst @ H.T) @ np.linalg.inv(S)
+            print(f"K: {K}")
+            print(f"K shape: {K.shape}")
             
-            # print(f'xEst: {xEst}')
-            # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-            # visualiser.plot_splines()
+            print(f'xEst: {xEst}')
+            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            visualiser.plot_splines()
             
-            # xEst = xEst + (K @ y)
+            print(f"K@y: {K @ y}")
+            xEst = xEst + (K @ y)
             
-            # print(f'xEst: {xEst}')
-            # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-            # visualiser.plot_splines()
+            print(f'xEst: {xEst}')
+            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            visualiser.plot_splines()
             
-            # PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
+            PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
             
             
           
@@ -375,7 +385,7 @@ def search_correspond_LM_ID(xEst, entry, feature_size_vector):
         map_points.append(np.array([x_values, y_values]))  # Format is a bit wierd due to how association method is implemented
         
         # Check for association
-        matched = data_associator.process(map_points, observation)
+        matched, u_ini, t_ini, u_fin, t_fin = data_associator.process(map_points, observation)
         
         if matched is True:
             new_landmark = False

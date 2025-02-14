@@ -2,92 +2,112 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import BSpline
 
-class BSplineVisualizer:
-    def __init__(self, control_points, degree, target_point, target_point2):
+class BSplineExtender:
+    def __init__(self, control_points, degree):
         self.control_points = control_points
         self.degree = degree
         self.n_control_points = len(control_points)
-        self.clamped_knot_vector = self._generate_clamped_knot_vector()
-        self.unclamped_knot_vector = self._generate_unclamped_knot_vector()
-        self.target_point = target_point
-        self.target_point2 = target_point2
+        self.clamped_knot_vector = self._generate_clamped_knot_vector(self.control_points, self.degree)
+        self.unclamped_knot_vector = self._generate_unclamped_knot_vector(self.control_points, self.degree)
+        self.target_point = []
+        self.target_point2 = []
         
         self.x_n_1 =[]
         self.x_n = []
 
-    def _generate_clamped_knot_vector(self):
+    def _generate_clamped_knot_vector(self, control_points, degree):
         """Generate a clamped knot vector."""
+        n_control_points = len(control_points)
         clamped_knot_vector = (
-            [0] * self.degree +  # Fully repeated at the start
-            list(range(self.n_control_points - self.degree + 1)) +  # Internal knots
-            [self.n_control_points - self.degree] * self.degree  # Fully repeated at the end
+            [0] * degree +  # Fully repeated at the start
+            list(range(n_control_points - degree + 1)) +  # Internal knots
+            [n_control_points - degree] * degree  # Fully repeated at the end
         )
         clamped_knot_vector = np.array(clamped_knot_vector)/clamped_knot_vector[-1]
         # print("Clamped Knot Vector:\n", clamped_knot_vector)
+        
         return clamped_knot_vector
 
-    def _generate_unclamped_knot_vector(self):
+    def _generate_unclamped_knot_vector(self, control_points, degree):
         """Generate a periodic (unclamped) knot vector."""
-        unclamped_knot_vector = np.arange(-self.degree, self.n_control_points + 1)
+        n_control_points = len(control_points)
+        unclamped_knot_vector = np.arange(-degree, n_control_points + 1)
         
-        unclamped_knot_vector = ( [0] * self.degree + # Fully repeated at the start
-        list(range(self.n_control_points  + 1)) # Fully repeated at the end
+        unclamped_knot_vector = ( [0] * degree + # Fully repeated at the start
+        list(range(n_control_points  + 1)) 
         )
         unclamped_knot_vector = np.array(unclamped_knot_vector)/unclamped_knot_vector[-1]
         # print("Right unclamped Vector:\n", unclamped_knot_vector)
+        
         return unclamped_knot_vector
 
-    def plot_bspline_with_knotsR(self, knot_vector, label, color):
+    def plot_bspline_with_knotsR(self, knot_vector, control_points, target_point, control_points_new , new_knot_vectorR, label):
         """Plot a B-spline along with its knots."""
+        # control_points_new , new_knot_vectorR = unclamp_right_side(knot_vector, control_points, target_point, self.degree)
+        
+        # Original spline
+        spline = BSpline(knot_vector, control_points, self.degree)
+        t = np.linspace(knot_vector[self.degree], knot_vector[-self.degree - 1], 500)
+        spline_points = spline(t)
+        
+        # Plot spline curve, control points, and knots
+        plt.plot(spline_points[:, 0], spline_points[:, 1], color = 'blue', label=label)
+        plt.plot(control_points[:, 0], control_points[:, 1], 'o--', color='blue', alpha=0.5)
+        knots = knot_vector[self.degree:-self.degree]
+        knot_points = spline(knots)
+        plt.plot(knot_points[:, 0], knot_points[:, 1], 'o', color='black', label="Knots")
+        
+        # Plot target point
+        plt.plot(target_point[0], target_point[1], 'o', color='red', label="Target Point")
+        
+        # New spline
+        rspline = BSpline(new_knot_vectorR, control_points_new, self.degree)
+        t = np.linspace(0, 1, 500)
+        rspline_points = rspline(t)
+        
+        # Plot new spline, control points and knots
+        plt.plot(rspline_points[:, 0], rspline_points[:, 1], color = 'yellow', label="New")
+        plt.plot(control_points_new[:, 0], control_points_new[:, 1], 'o--', color='purple', alpha=0.5)
+        
+        plt.title("Right extention")
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        plt.axis("equal")
+        plt.legend()
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.show()
+        
+    def plot_bspline_with_knotsL(self, knot_vector, control_points, target_point, control_points_new , new_knot_vector, label):
+        """Plot a B-spline along with its knots."""
+        
+        
+        # Original spline
         spline = BSpline(knot_vector, self.control_points, self.degree)
         t = np.linspace(knot_vector[self.degree], knot_vector[-self.degree - 1], 500)
         spline_points = spline(t)
         
-        # Plot the spline curve
-        plt.plot(spline_points[:, 0], spline_points[:, 1], color, label=label)
-        # Plot the control polygon
-        plt.plot(self.control_points[:, 0], self.control_points[:, 1], 'o--', color=color, alpha=0.5)
-        # Plot the knots on the curve
+        # Plot the spline curve, control points, and knots
+        plt.plot(spline_points[:, 0], spline_points[:, 1], color ='red', label=label)
+        plt.plot(control_points[:, 0], control_points[:, 1], 'o--', color='red', alpha=0.5)
         knots = knot_vector[self.degree:-self.degree]
         knot_points = spline(knots)
         plt.plot(knot_points[:, 0], knot_points[:, 1], 'o', color='black', label="Knots")
-        plt.plot(self.target_point[0], self.target_point[1], 'o', color='red', label="Target Point")
         
-        control_points_new , new_knot_vector = unclamp_right_side(knot_vector, self.control_points, self.target_point, self.degree)
+        # Plot target point
+        plt.plot(target_point[0], target_point[1], 'o', color='red', label="Target Point")
+    
+        # New spline
+        lspline = BSpline(new_knot_vector, control_points_new, self.degree)
+        t = np.linspace(0, 1, 500)
+        lspline_points = lspline(t)
+        
+        # Plot new spline, control points and knots
+        plt.plot(lspline_points[:, 0], lspline_points[:, 1], color = 'green', label="New")
         plt.plot(control_points_new[:, 0], control_points_new[:, 1], 'o--', color='purple', alpha=0.5)
         
-        rspline = BSpline(new_knot_vector, control_points_new, self.degree)
-        t = np.linspace(0, 1, 500)
-        rspline_points = rspline(t)
-        plt.plot(rspline_points[:, 0], rspline_points[:, 1], color = 'yellow', label="New")
-        
-    def plot_bspline_with_knotsL(self, knot_vector, label, color):
-            """Plot a B-spline along with its knots."""
-            spline = BSpline(knot_vector, self.control_points, self.degree)
-            t = np.linspace(knot_vector[self.degree], knot_vector[-self.degree - 1], 500)
-            spline_points = spline(t)
             
-            # Plot the spline curve
-            plt.plot(spline_points[:, 0], spline_points[:, 1], color, label=label)
-            # Plot the control polygon
-            plt.plot(self.control_points[:, 0], self.control_points[:, 1], 'o--', color=color, alpha=0.5)
-            # Plot the knots on the curve
-            knots = knot_vector[self.degree:-self.degree]
-            knot_points = spline(knots)
-            plt.plot(knot_points[:, 0], knot_points[:, 1], 'o', color='black', label="Knots")
-            plt.plot(self.target_point2[0], self.target_point2[1], 'o', color='red', label="Target Point")
-            
-            control_points_newL, new_knot_vectorL = unclmap_left_side(knot_vector, self.control_points, self.target_point2, self.degree)
-            plt.plot(control_points_newL[:, 0], control_points_newL[:, 1], 'o--', color='purple', alpha=0.5)
-            
-            lspline = BSpline(new_knot_vectorL, control_points_newL, self.degree)
-            t = np.linspace(0, 1, 500)
-            lspline_points = lspline(t)
-            plt.plot(lspline_points[:, 0], lspline_points[:, 1], color = 'green', label="New")
-            
-
-    
-
     def plot_basis_functions(self, knot_vector, label):
         """Plot basis functions for the given knot vector."""
         t = np.linspace(knot_vector[0], knot_vector[-1], 500)
@@ -111,36 +131,22 @@ class BSplineVisualizer:
 
         # Clamped B-spline
         plt.subplot(3, 2, 1)
-        self.plot_bspline_with_knotsR(self.clamped_knot_vector, "Clamped B-spline", "blue")
+        control_points_newR , new_knot_vectorR = unclamp_right_side(self.clamped_knot_vector, control_points, self.target_point, self.degree)
+        self.plot_bspline_with_knotsR(self.clamped_knot_vector, control_points, self.target_point, control_points_newR , new_knot_vectorR, "Clamped B-spline")
         plt.title("Right extention")
         plt.xlabel("X")
         plt.ylabel("Y")
-        # plt.xlim(0, 8)
-        # plt.ylim(0, 4)
         plt.axis("equal")
         plt.legend()
         plt.grid(True)
         
-        # Periodic (unclamped) B-spline
-        plt.subplot(3, 2, 3)
-        self.plot_bspline_with_knotsL(self.clamped_knot_vector, "Clamped B-spline", "red")
-        plt.title("Left extention")
-        plt.xlabel("X")
-        plt.ylabel("Y")
-        # plt.xlim(0, 8)
-        # plt.ylim(0, 4)
-        plt.axis("equal")
-        plt.legend()
-        plt.grid(True)
-
         # # Periodic (unclamped) B-spline
         # plt.subplot(3, 2, 3)
-        # self.plot_bspline_with_knotsR(self.unclamped_knot_vector, "Periodic B-spline", "red")
-        # plt.title("Periodic Cubic B-spline")
+        # control_points_newL, new_knot_vectorL = unclmap_left_side(self.clamped_knot_vector, control_points, self.target_point2, self.degree)
+        # self.plot_bspline_with_knotsL(self.clamped_knot_vector, control_points, self.target_point2,  control_points_newL, new_knot_vectorL,  "Clamped B-spline")
+        # plt.title("Left extention")
         # plt.xlabel("X")
         # plt.ylabel("Y")
-        # # plt.xlim(0, 8)
-        # # plt.ylim(0, 4)
         # plt.axis("equal")
         # plt.legend()
         # plt.grid(True)
@@ -156,6 +162,26 @@ class BSplineVisualizer:
         # Adjust layout
         plt.tight_layout()
         plt.show()
+        
+    def extend_to_multiple_targets(self, control_points, degree, target_points):
+        """Extend a B-spline to multiple target points."""
+        n_targets = len(target_points)
+        self.clamped_knot_vector = self._generate_clamped_knot_vector(control_points, degree)
+        control_pointsR, knot_vectorR = unclamp_right_side(self.clamped_knot_vector, control_points, target_points[0], degree)
+        self.plot_bspline_with_knotsR(self.clamped_knot_vector, control_points, target_points[0], control_pointsR , knot_vectorR, "Clamped B-spline")
+        control_points = control_pointsR
+        self.clamped_knot_vector = knot_vectorR
+        # visualizer.visualize()
+        for i in range(1, n_targets):
+            target_point = target_points[i]
+            control_pointsR, knot_vectorR = unclamp_right_side(self.clamped_knot_vector, control_points, target_point, degree)
+            self.plot_bspline_with_knotsR(self.clamped_knot_vector, control_points, target_points[i], control_pointsR , knot_vectorR, "Clamped B-spline")
+            self.clamped_knot_vector = self._generate_clamped_knot_vector(control_points, degree)
+            self.target_point = target_point
+            control_points = control_pointsR
+            self.clamped_knot_vector = knot_vectorR
+           
+            # visualizer.visualize()
         
 def find_u_distanceR(knot_vector, control_points, target_point, degree):
     k = degree + 1  # Spline order
@@ -198,6 +224,8 @@ def find_u_distanceL(knot_vector, control_points, target_point, degree):
     # u = -0.05
     
     return u
+
+
 
 def unclmap_left_side(knot_vector, control_points, target_point, degree):
     k = degree + 1  # Spline order
@@ -293,6 +321,8 @@ def _generate_clamped_knot_vector(degree, control_points):
     return clamped_knot_vector
 
 
+        
+
 # Control points for the B-spline
 control_points = np.array([
     [1.0, 0.0],
@@ -304,9 +334,21 @@ control_points = np.array([
 ])
 
 target_pointR = np.array([4.0, 3])
+
 target_pointL = np.array([8.0, 0.0])
 degree = 3
 
-# Create a BSplineVisualizer instance and visualize
-visualizer = BSplineVisualizer(control_points, degree, target_pointR, target_pointL)
-visualizer.visualize()
+# # Create a BSplineExtender instance and visualize
+# visualizer = BSplineExtender(control_points, degree)
+# visualizer.target_point = target_pointR 
+# visualizer.target_point2 = target_pointL
+# knot_vector = visualizer._generate_clamped_knot_vector(control_points, degree)
+# control_points_newR , new_knot_vectorR = unclamp_right_side(knot_vector, control_points, target_pointR, degree)
+# control_points_newL, new_knot_vectorL = unclmap_left_side(knot_vector, control_points, target_pointL, degree)
+# visualizer.visualize()
+
+target_points = np.array([[4.0, 3], [2.0, 3.0], [1,2]])
+
+# target_points = np.array([[4.0, 3]])
+extender = BSplineExtender(control_points, degree)
+extender.extend_to_multiple_targets(control_points, degree, target_points)

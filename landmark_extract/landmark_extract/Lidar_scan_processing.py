@@ -76,7 +76,7 @@ class myNode(Node):
 		self.angles = angles
   
 		#Cut scan with 1
-		# ranges = ranges[:-1] # For F1tenh thcar
+		ranges = ranges[:-1] # For F1tenh thcar
 		# Check if scan and ranges are the same length
 		if len(ranges) != len(angles):
 			self.get_logger().error("Scan and ranges are not the same length.")
@@ -472,8 +472,8 @@ class myNode(Node):
 		plt.clf()
   
 		# Plot all points
-		plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey')
-		# plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') #F1tenth
+		# plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') # Husky
+		plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') #F1tenth
 
 		if self.scan_segments:
 			
@@ -504,6 +504,8 @@ class myNode(Node):
 			# plt.xlim(-5.5, 5.5)
 			plt.xlim(-15, 15)
 			plt.ylim(-15, 15)
+			plt.xlim(-30, 30)
+			plt.ylim(-30, 30)
 			plt.tight_layout()
 			plt.grid(True)
 			plt.draw()
