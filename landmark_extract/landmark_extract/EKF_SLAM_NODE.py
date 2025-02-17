@@ -12,7 +12,7 @@ from std_msgs.msg import String
 import json
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
-from Test_scipts.Observation_model import SplineLaserPredictor
+from Test_scipts.Observation_model2 import SplineLaserPredictor
 from Test_scipts.Bspline_data_association_test import SplineDataAssociation
 from Spline_map_visualiser import SplineMapVisualiser
 from scipy.interpolate import BSpline

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import comb
+from scipy.interpolate import BSpline
 
 class SplineMapVisualiser:
     def __init__(self, state_vector, feature_sizes):
@@ -35,6 +36,20 @@ class SplineMapVisualiser:
             bernstein = SplineMapVisualiser.bernstein_basis(n, i, t)
             point += bernstein * control_points[i]
         return point
+    
+    @staticmethod
+    def bspline_function(control_points, t):
+        """Evaluate the cubic B-spline at parameter t."""
+        degree = 3  # Cubic B-spline
+        n = len(control_points)  # Number of control points
+        
+        # Knot vector with uniform spacing
+        knots = np.concatenate(([0] * degree, np.linspace(0, 1, n - degree + 1), [1] * degree))
+        
+        # Create B-spline
+        spline = BSpline(knots, control_points, degree)
+        
+        return spline(t)  # Evaluate spline at t
 
     def plot_splines(self):
         """Visualize the robot pose and spline features."""
@@ -53,7 +68,7 @@ class SplineMapVisualiser:
         # Plot splines
         t_values = np.linspace(0, 1, 100)
         for i, control_points in enumerate(self.features):
-            spline_curve = np.array([self.spline_function(control_points, t) for t in t_values])
+            spline_curve = np.array([self.bspline_function(control_points, t) for t in t_values])
             plt.plot(control_points[:, 0], control_points[:, 1], 'ko-', label=f'Control Points {i+1}')
             plt.plot(spline_curve[:, 0], spline_curve[:, 1], 'b-', label=f'Spline {i+1}')
         
@@ -76,14 +91,14 @@ def main(args=None):
     # (x_r, y_r, theta_r, x1_1, x1_2, x1_3, y1_1, y1_2, y1_3, x2_1, x2_2, y2_1, y2_2)
     state_vector = np.array([
         2.0, 3.0, np.pi/4,  # Robot pose (x_r, y_r, theta_r)
-        1.0, 2.0, 3.0,  # Feature 1: x-coordinates
-        1.0, 1.5, 2.0,  # Feature 1: y-coordinates
-        4.0, 5.0,  # Feature 2: x-coordinates
-        3.0, 4.0   # Feature 2: y-coordinates
+        1.0, 2.0, 3.0, 4.0,  # Feature 1: x-coordinates
+        1.0, 1.5, 2.0, 2.5, # Feature 1: y-coordinates
+        4.0, 5.0, 6.0, 7.0,  # Feature 2: x-coordinates
+        3.0, 4.0, 5.0, 6.0   # Feature 2: y-coordinates
     ])
 
     # Feature sizes: First feature has 3 control points, second feature has 2
-    feature_sizes = [3, 2]
+    feature_sizes = [4, 4]
 
     # Create visualizer instance and plot
     visualiser = SplineMapVisualiser(state_vector, feature_sizes)

@@ -121,7 +121,7 @@ class myNode(Node):
 		# self.bspline_fitter.calculate_knot_segment_lengths()
 		# self.bspline_fitter.visualize()
 		self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list = self.bspline_fitter.send_results()
-		self.bspline_fitter.visualize_continues()
+		# self.bspline_fitter.visualize_continues()
 		# self.bspline_fitter.fit_bspline_to_lidar(self.scan_segments[3], knot_distance=0.5)
 		# self.bspline_fitter.plot_bspline()
   

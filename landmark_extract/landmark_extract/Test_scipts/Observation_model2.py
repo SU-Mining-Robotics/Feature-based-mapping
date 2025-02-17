@@ -77,10 +77,42 @@ class SplineLaserPredictor:
             bernstein_der = SplineLaserPredictor.bernstein_derivative(n, i, t)
             derivative += bernstein_der * control_points[i]
         return derivative
+    
+    @staticmethod
+    def bspline_function(control_points, t):
+        """Evaluate the cubic B-spline at parameter t."""
+        degree = 3  # Cubic B-spline
+        n = len(control_points)  # Number of control points
+        
+        # Knot vector with uniform spacing
+        knots = np.concatenate(([0] * degree, np.linspace(0, 1, n - degree + 1), [1] * degree))
+        
+        # Create B-spline
+        spline = BSpline(knots, control_points, degree)
+        
+        return spline(t)  # Evaluate spline at t
+
+    @staticmethod
+    def bspline_derivative(control_points, t):
+        """Evaluate the derivative of the cubic B-spline at parameter t."""
+        degree = 3  # Cubic B-spline
+        n = len(control_points)  # Number of control points
+        
+        # Knot vector
+        knots = np.concatenate(([0] * degree, np.linspace(0, 1, n - degree + 1), [1] * degree))
+        
+        # Create B-spline
+        spline = BSpline(knots, control_points, degree)
+        
+        # Compute derivative using the derivative method
+        spline_derivative = spline.derivative()
+        
+        return spline_derivative(t)
 
     def compute_tangent_angle(self, t_star):
         """Compute the tangent angle at t_star."""
-        derivative = self.spline_derivative(self.control_points, t_star)
+        # derivative = self.spline_derivative(self.control_points, t_star)
+        derivative = self.bspline_derivative(self.control_points, t_star)
         tangent_angle = np.arctan2(derivative[1], derivative[0])  # atan2(dy, dx)
         return (np.pi-(-tangent_angle))
 
@@ -90,7 +122,7 @@ class SplineLaserPredictor:
 
         # Define a function for finding the root (sy = 0)
         def sy_root(t):
-            return self.spline_function(transformed_points, t)[1]
+            return self.bspline_function(transformed_points, t)[1]
 
         # initial_guesses = np.linspace(0, 1, 10)  # Initial guesses for t
         t_initial = 0.5
@@ -98,7 +130,7 @@ class SplineLaserPredictor:
             t_star = newton(sy_root, t_initial)  # Newton-Raphson to find the root
             # t_star =0.73
             if 0 <= t_star <= 1:
-                predicted_distance = self.spline_function(transformed_points, t_star)[0]
+                predicted_distance = self.bspline_function(transformed_points, t_star)[0]
                 tangent_angle = self.compute_tangent_angle(t_star)  # Tangent angle at t_star
                 # tangent_angle = 0.0
                 return predicted_distance, t_star, tangent_angle, transformed_points
@@ -132,7 +164,7 @@ class SplineLaserPredictor:
 
             # Define the root-finding function
             def sy_root(t):
-                return self.spline_function(transformed_points, t)[1]
+                return self.bspline_function(transformed_points, t)[1]
 
             # Try multiple initial guesses for t
             initial_guesses = np.linspace(0.5, 1, 10)  # Customize the range and number of guesses
@@ -144,7 +176,7 @@ class SplineLaserPredictor:
                     t_star = newton(sy_root, t_initial)  # Use Newton-Raphson to find the root
                     # Ensure t_star is within the valid range [0, 1]
                     if 0 <= t_star <= 1:
-                        predicted_distance = self.spline_function(transformed_points, t_star)[0]
+                        predicted_distance = self.bspline_function(transformed_points, t_star)[0]
                         tangent_angle = self.compute_tangent_angle(t_star)  # Tangent angle at t_star
                         break
                 except RuntimeError:
@@ -174,8 +206,8 @@ class SplineLaserPredictor:
         r_spline = BSpline(knots, reversed_control_points, degree)
 
         t_values = np.linspace(0, 1, 100)
-        original_spline_points = np.array([self.spline_function(self.control_points, t) for t in t_values])
-        transformed_spline_points = np.array([self.spline_function(transformed_points, t) for t in t_values])
+        original_spline_points = np.array([self.bspline_function(self.control_points, t) for t in t_values])
+        transformed_spline_points = np.array([self.bspline_function(transformed_points, t) for t in t_values])
 
         laser_origin = np.array([self.robot_pose[0], self.robot_pose[1]])
         laser_direction = np.array([np.cos(self.laser_angle + self.robot_pose[2]), 
@@ -186,11 +218,12 @@ class SplineLaserPredictor:
         laser_line_y = [0, 0]
 
         # Calculate intersection point and tangent vector
-        intersection_point = self.spline_function(self.control_points, t_star)
-        tangent_vector = self.spline_derivative(self.control_points, t_star)  # Assuming spline_derivative is implemented
+        intersection_point = self.bspline_function(self.control_points, t_star)
+        # tangent_vector = self.spline_derivative(self.control_points, t_star)  # Assuming spline_derivative is implemented
+        tangent_vector = self.bspline_derivative(self.control_points, t_star) 
         tangent_vector_normalized = tangent_vector / np.linalg.norm(tangent_vector)
         
-        test_intersection_point = self.spline_function(self.control_points, 0.5)
+        test_intersection_point = self.bspline_function(self.control_points, 0.5)
 
         # Generate tangent line
         tangent_start = intersection_point - tangent_vector_normalized
@@ -245,7 +278,7 @@ class SplineLaserPredictor:
 
         # Generate the original spline points
         t_values = np.linspace(0, 1, 100)
-        original_spline_points = np.array([self.spline_function(control_points, t) for t in t_values])
+        original_spline_points = np.array([self.bspline_function(control_points, t) for t in t_values])
 
         # Plot the spline and lidar beams
         plt.figure(figsize=(10, 8))
@@ -287,7 +320,7 @@ def main(args=None):
     robot_pose = np.array([0.0, 0.0, 0.0])  # Robot pose [x, y, theta]
     laser_angle = -2.7405292607843876  # Laser beam angle (in radians)
     # laser_angle = 2.7405292607843876  # Laser beam angle (in radians)
-    # laser_angle = 3.5405292607843876- 2 * np.pi  # Laser beam angle (in radians)
+    laser_angle = 3.5405292607843876- 2 * np.pi  # Laser beam angle (in radians)
     # laser_angle = -3.1405292607843876  # behaves wierd
     # laser_angle = -3.8405292607843876  #Still acceptable
     # laser_angle = -2.7405292607843876  # Wierd

@@ -35,20 +35,25 @@ class BSplineFitter:
         """
         Fit a B-spline to a lidar segment with a specified knot distance.
         """
+        # Determine the curve length
         x, y = lidar_segment[:, 0], lidar_segment[:, 1]
         points = np.column_stack([x, y])
         distances = np.linalg.norm(np.diff(points, axis=0), axis=1)
         curve_length = np.sum(distances)
         # print("Curve Length: ", curve_length)
         
+        # Skip fitting if the curve length is less than the knot spacing
         if curve_length < knot_spacing:
             logging.warning("Curve length is less than knot spacing. Skipping fitting.")
             placeholder = np.array([])  # Placeholder for skipped segments
             return curve_length, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder
         
+        # Calculate knots and control points
         knots, control_points = self.calculate_knots_control_points(curve_length, x, y, degree=3, knot_spacing=knot_spacing)
         # print(f'Knots length: {len(knots)}')
         # print(f'Control Points length: {len(control_points)}')
+        
+        # Get the B-spline representation and collocation matrix
         spline = BSpline(knots, control_points, degree)
         Collocation_Matrix, B_pseudoinverse, reversed_control_points, r_spline = self.calculate_collocation_matrix(curve_length, x, y, knots, degree=3, knot_spacing=knot_spacing)
         
@@ -102,7 +107,6 @@ class BSplineFitter:
             """Calculate the collocation matrix B for the B-spline."""
            
             num_points = len(x_noisy)
-            # Parameter values corresponding to noisy data
             t = np.linspace(0, curve_length, num_points)
 
             # Evaluate basis functions for all t
@@ -287,7 +291,7 @@ class BSplineFitter:
             
             # Plot knots
             knot_positions = spline(knots[self.degree:-self.degree])  # Interior knots
-            plt.scatter(knot_positions[:, 0], knot_positions[:, 1], color="blue", s=20, label="Knots", zorder=5)
+            # plt.scatter(knot_positions[:, 0], knot_positions[:, 1], color="blue", s=20, label="Knots", zorder=5)
             
             # Plot reversed B-spline and control points
             plt.plot(r_spline(t)[:, 0], r_spline(t)[:, 1], color="purple", label="Reversed B-spline")
@@ -295,7 +299,7 @@ class BSplineFitter:
             
             # Plot reversed knots
             reversed_knot_positions = r_spline(knots[self.degree:-self.degree])
-            plt.scatter(reversed_knot_positions[:, 0], reversed_knot_positions[:, 1], color="yellow", s=20, label="Reversed Knots", zorder=5)
+            # plt.scatter(reversed_knot_positions[:, 0], reversed_knot_positions[:, 1], color="yellow", s=20, label="Reversed Knots", zorder=5)
         
         # Customize plot appearance
         plt.title('B-Spline Curves Fitted to Lidar Segments with Control Point Centroids')
@@ -316,7 +320,7 @@ def main():
         # np.array([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]),  # Example straight segment
         np.array([[0, 0], [1, 0] ]),  # Example straight segment
         # np.array([[0, 0], [0.8, 0] ]), # Gives an error
-        np.array([[4, 0], [4.5, 0.2], [5.5, 0.9], [5.9, 1.5], [6, 2]])  # Example curved segment
+        np.array([[4, 0], [4.5, 0.2], [5.5, 0.9], [5.9, 1.5], [6, 2], [6, 2.2]])  # Example curved segment
     ]
 
     bspline_fitter = BSplineFitter()
