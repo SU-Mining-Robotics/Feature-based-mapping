@@ -18,7 +18,7 @@ X, Y = np.meshgrid(x, y)
 Z_original = spline_surface.ctrl_pts.reshape(grid_x, grid_y).copy()
 
 # Modify a specific control point (e.g., increase height at index [5, 5])
-spline_surface.ctrl_pts[5 * grid_y + 5] += 1  # Increase height
+spline_surface.ctrl_pts[5 * grid_y + 5] += 0.5  # Increase height
 # spline_surface.ctrl_pts[5 * grid_y + 6] -= 1  # Increase height
 spline_surface.ctrl_pts[10 * grid_x + 10] -= 1  # Increase height
 

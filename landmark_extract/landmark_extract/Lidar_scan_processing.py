@@ -36,8 +36,8 @@ from scipy.interpolate import interpolate
 class myNode(Node):
 	def __init__(self):
 		super().__init__("Lidar_proccesing_node")  
-		# self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
-		self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
+		self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
+		# self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
   
   		# Publisher for visualization
 		self.segment_publisher = self.create_publisher(MarkerArray, "/scan_segments", 10)
@@ -47,10 +47,10 @@ class myNode(Node):
 		# self.range_bearing_publisher = self.create_publisher(String, "/range_bearing_segments", 10)
 		
 		self.alpha_max = np.pi / 4  # Relative angular threshold
-		self.eta = 2 #Reletive lenght threshold	
-		self.min_point_in_segment = 6  # Sets the minimum allowable points in a segment to avoid segments with only 1 point
+		self.eta = 2 # Reletive lenght threshold	
+		self.min_point_in_segment = 4  # Sets the minimum allowable points in a segment to avoid segments with only 1 point
 		self.min_segmentation_threshold = 0.1 # Set minimum distance to avoid segmetation between sets of points that are too close to each other
-		self.min_point_in_angle_check = 10 # Number of points to consider in angle check
+		self.min_point_in_angle_check = 10 # Number of points to consider in angle check #10
 
 		# Variables for storing data
 		self.ranges = []
@@ -60,7 +60,6 @@ class myNode(Node):
 		self.B_pseudoinverse_list = []
 
   		# Classes
-		self.saveScanData = saveScanData()
 		self.bspline_fitter = BSplineFitter()
   
 		# self.create_timer(0.1, self.plot_segment_continous)
@@ -144,7 +143,7 @@ class myNode(Node):
 		# # Visualisation
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
-		# self.plot_segments_continous()
+		self.plot_segments_continous()
   
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []
@@ -329,17 +328,20 @@ class myNode(Node):
 			if (max(d_i, d_next) <= eta * min(d_i, d_next)) or (d_i <= min_segment_threshold and d_next <= min_segment_threshold):
 				current_segment.append(points[i])
 				current_range_bearing.append((ranges[i], angles[i]))
-			else:
+			else:     
 				if not distance_variance_detected:
 					current_segment.append(points[i])
 					current_range_bearing.append((ranges[i], angles[i]))
 					distance_variance_detected = True
 				else:
+					# Store the completed segment
 					segments.append(np.array(current_segment))
 					range_bearing_segments.append(np.array(current_range_bearing))
+
+					# Start a new segment cleanly
 					current_segment = [points[i]]
 					current_range_bearing = [(ranges[i], angles[i])]
-					distance_variance_detected = False
+					distance_variance_detected = False  # Ensure reset here
      
 		# Check if the last segment should wrap around and join with the first segment
 		if current_segment:
@@ -353,7 +355,8 @@ class myNode(Node):
 			elif len(current_segment) >= min_point_in_segment:
 				segments.append(np.array(current_segment))  # Add as a separate segment if it meets the minimum length
 				range_bearing_segments.append(np.array(current_range_bearing))
-
+    
+   
 		# Additional segmentation based on angle within each segment
 		final_segments = []
 		final_range_bearing_segments = []
@@ -414,6 +417,9 @@ class myNode(Node):
 			if len(sub_segment) >= min_point_in_segment:
 				final_segments.append(np.array(sub_segment))
 				final_range_bearing_segments.append(np.array(sub_range_bearing))
+    
+		# Check for outliers at the end of each segment
+		final_segments, final_range_bearing_segments = self.remove_edge_outliers(final_segments, final_range_bearing_segments)
 
 		# End timing
 		end_time = time.time()
@@ -423,48 +429,72 @@ class myNode(Node):
 		return final_segments, final_range_bearing_segments, execution_time #Use the line for the angle segmentation
 
 
-	def visualise_scan_features(self, lenghts, angles):
-		figure, ax = plt.subplots(2)
-		ax[0].plot(lenghts)
-		ax[0].set_title("Lenghts")
-  
-		ax[1].plot(angles)
-		ax[1].set_title("Cos alpha")
-		plt.show()
+	def remove_edge_outliers(self, segments, range_bearing_segments, threshold_factor=1.5):
+		for i in range(len(segments)):
+			current_segment = segments[i]
+			current_range_bearing = range_bearing_segments[i]
 
-	def plot_segments(self, segments):
-		"""
-		Visualizes the segmented points, marking the start and end of each segment.
+			if len(current_segment) > 3:  # Need at least 4 points to have inner distances
+				# Compute distances between consecutive points
+				distances = np.linalg.norm(np.diff(current_segment, axis=0), axis=1)
 
-		Parameters:
-		segments (list of np.array): List of arrays where each array represents a segment of points
-		"""
+				# Exclude edge distances when computing average
+				avg_distance = np.mean(distances[1:-1]) if len(distances) > 2 else np.mean(distances)
 
-		plt.figure(figsize=(10, 10))
+				# Check start point
+				d_start = distances[0]  # Distance from first to second point
+				if d_start > threshold_factor * avg_distance:
+					current_segment = current_segment[1:]
+					current_range_bearing = current_range_bearing[1:]
+					distances = distances[1:]  # Update distances after removal
 
-		# Iterate over each segment and plot its points
-		for i, segment in enumerate(segments):
-			if len(segment) > 0:
-				x_points = segment[:, 0]
-				y_points = segment[:, 1]
+				# Check end point
+				d_end = distances[-1]  # Distance from last to second-last point
+				if d_end > threshold_factor * avg_distance:
+					current_segment = current_segment[:-1]
+					current_range_bearing = current_range_bearing[:-1]
 
-				# Plot the segment points
-				plt.plot(x_points, y_points, label=f'Segment {i+1}', marker='o', linestyle='-', markersize=4)
+			# Update the segments
+			segments[i] = current_segment
+			range_bearing_segments[i] = current_range_bearing
 
-				# Highlight the start and end points
-				plt.plot(x_points[0], y_points[0], 'go', markersize=8, label=f'Start of Segment {i+1}')
-				plt.plot(x_points[-1], y_points[-1], 'ro', markersize=8, label=f'End of Segment {i+1}')
+		return segments, range_bearing_segments
 
-		plt.xlabel("X Position")
-		plt.ylabel("Y Position")
-		plt.title("Segmented Points Visualization with Start and End Points")
-		plt.legend(loc='upper left', bbox_to_anchor=(1, 1))  # Place legend outside the graph
-		plt.axis("equal")
-		# plt.ylim(-5.5, 5.5)
-		# plt.xlim(-5.5, 5.5)
-		plt.tight_layout()
-		plt.grid(True)
-		plt.show()
+	# def remove_edge_outliers(self, segments, range_bearing_segments, threshold_factor=1.0, num_neighbors=3):
+	# 	for i in range(len(segments)):
+	# 		current_segment = segments[i]
+	# 		current_range_bearing = range_bearing_segments[i]
+
+	# 		if len(current_segment) > num_neighbors + 1:
+	# 			# Compute distances between consecutive points
+	# 			distances = np.linalg.norm(np.diff(current_segment, axis=0), axis=1)
+
+	# 			# Start point: compute average of next `num_neighbors` distances
+	# 			num_start = min(num_neighbors, len(distances) - 1)
+	# 			avg_start_distance = np.mean(distances[1:num_start + 1])
+
+	# 			d_start = distances[0]  # Distance from first to second point
+	# 			if d_start > threshold_factor * avg_start_distance:
+	# 				current_segment = current_segment[1:]
+	# 				current_range_bearing = current_range_bearing[1:]
+	# 				distances = distances[1:]  # Update distances after removal
+
+	# 			# End point: compute average of previous `num_neighbors` distances
+	# 			num_end = min(num_neighbors, len(distances) - 1)
+	# 			avg_end_distance = np.mean(distances[-num_end - 1:-1])
+
+	# 			d_end = distances[-1]  # Distance from last to second-last point
+	# 			if d_end > threshold_factor * avg_end_distance:
+	# 				current_segment = current_segment[:-1]
+	# 				current_range_bearing = current_range_bearing[:-1]
+
+	# 		# Update the segments
+	# 		segments[i] = current_segment
+	# 		range_bearing_segments[i] = current_range_bearing
+
+	# 	return segments, range_bearing_segments
+
+
   
 	def plot_segments_continous(self):
 		
@@ -472,7 +502,7 @@ class myNode(Node):
 		plt.clf()
   
 		# Plot all points
-		plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') # Husky
+		plt.scatter(self.lenghts * np.cos(self.angles), self.lenghts * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') # Husky / sim
 		# plt.scatter(self.lenghts[:-1] * np.cos(self.angles), self.lenghts[:-1] * np.sin(self.angles),s=0.8,  label="All Points", alpha=0.4, color='grey') #F1tenth1
 
 		if self.scan_segments:
@@ -486,15 +516,16 @@ class myNode(Node):
 					y_points = segment[:, 1]
 
 					# Plot the segment points
-					# plt.plot(x_points, y_points, label=f'Segment {i+1}', marker='o', linestyle='-', markersize=1)
-					plt.scatter(x_points, y_points, s=1,  label=f'Segment {i+1}')
+					plt.plot(x_points, y_points, label=f'Segment {i+1}', marker='o', linestyle='-', markersize=1)
+					# plt.scatter(x_points, y_points, s=1,  label=f'Segment {i+1}')
+					# plt.plot(x_points, y_points,  label=f'Segment {i+1}')
 
 					# Highlight the start and end points
 					# plt.plot(x_points[0], y_points[0], 'go', markersize=8, label=f'Start of Segment {i+1}')
 					# plt.plot(x_points[-1], y_points[-1], 'ro', markersize=8, label=f'End of Segment {i+1}')
 
 			# Plot arrow at centre
-			plt.arrow(0, 0, 0.5, 0, head_width=0.1, head_length=0.1, fc='k', ec='k')
+			# plt.arrow(0, 0, 0.5, 0, head_width=0.1, head_length=0.1, fc='k', ec='k')
 			plt.xlabel("X Position")
 			plt.ylabel("Y Position")
 			plt.title("Segmented Points Visualization with Start and End Points")
@@ -504,8 +535,8 @@ class myNode(Node):
 			# plt.xlim(-5.5, 5.5)
 			plt.xlim(-15, 15)
 			plt.ylim(-15, 15)
-			plt.xlim(-30, 30)
-			plt.ylim(-30, 30)
+			# plt.xlim(-30, 30)
+			# plt.ylim(-30, 30)
 			plt.tight_layout()
 			plt.grid(True)
 			plt.draw()
@@ -562,32 +593,9 @@ class myNode(Node):
 		plt.grid(True)
 		plt.show()
   
-class saveScanData:
-	def __init__(self):
-		self.scanData = np.zeros((360,5))
-		self.scanParameters = np.zeros((4,1))
-		self.testNumber = 0
-		# self.path = f'/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Scan_noise/scanData_{self.testNumber}.csv'
-		# self.pPath = f'/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Scan_noise/scanParameters_{self.testNumber}.csv'
-		
-		self.desktop_path = os.path.expanduser("src/landmark_extract/Simple_test_data") #path on car to Desktop
-		self.path = os.path.join(self.desktop_path, f"scanData_{self.testNumber}.csv")
-		
-	def saveScan(self):
-		while os.path.exists(self.path):
-			self.testNumber += 1
-			self.path = os.path.join(self.desktop_path, f"scanData_{self.testNumber}.csv")
-		np.savetxt(self.path, self.scanData, delimiter=',')
-
-	def saveParameters(self):
-		self.pPath = os.path.join(self.desktop_path, f"scanParameters.csv")
-		np.savetxt(self.pPath, self.scanParameters, delimiter=',')
-		
-  
 def main(args=None):
 	rclpy.init(args=args)
 	node = myNode()
-	# rclpy.spin_once(node)
 	rclpy.spin(node)
 	rclpy.shutdown()
 

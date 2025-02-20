@@ -65,7 +65,6 @@ class PointCloudProcessor(Node):
         except Exception as e:
             self.get_logger().warn(f"Could not get transform: {str(e)}")
 
-
     def pointcloud_callback(self, msg):
         
         pcd = self.ros_to_open3d(msg)

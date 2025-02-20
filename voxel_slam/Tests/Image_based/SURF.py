@@ -40,7 +40,7 @@ def surf_feature_matching(img1_path, img2_path):
 
 # Example usage
 # Provide paths to two images for matching
-img1_path = "image1.jpg"  # Replace with your image path
-img2_path = "image2.jpg"  # Replace with your image path
+img1_path = "src/voxel_slam/Tests/Image_based/Image1.jpg"  # Replace with your image path
+img2_path = "src/voxel_slam/Tests/Image_based/Image2.jpg"  # Replace with your image path
 
 surf_feature_matching(img1_path, img2_path)

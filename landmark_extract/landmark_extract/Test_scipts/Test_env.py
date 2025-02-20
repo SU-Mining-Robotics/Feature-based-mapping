@@ -1,91 +1,60 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.spatial.transform import Rotation as R
-from sklearn.neighbors import NearestNeighbors
+from scipy.optimize import minimize
 
-# === Simulated Global Map ===
-def generate_map():
-    walls = np.array([
-        [0, 0], [10, 0], [10, 10], [0, 10], [0, 0]  # Rectangle
-    ])
-    return walls
-
-# === Simulated LiDAR Scan ===
-def simulate_lidar(pose, map_points, noise_std=0.05):
-    x, y, theta = pose
-    rotation = R.from_euler('z', theta).as_matrix()[:2, :2]
-    translation = np.array([x, y])
-    map_local = (map_points - translation) @ rotation.T
-    distances = np.linalg.norm(map_local, axis=1)
-    angles = np.arctan2(map_local[:, 1], map_local[:, 0])
-    distances += np.random.normal(0, noise_std, size=distances.shape)
-    return np.column_stack((distances * np.cos(angles), distances * np.sin(angles)))
-
-# === ICP Algorithm ===
-def icp(actual_scan, predicted_scan, max_iterations=20, tolerance=1e-4):
-    for iteration in range(max_iterations):
-        nbrs = NearestNeighbors(n_neighbors=1).fit(predicted_scan)
-        distances, indices = nbrs.kneighbors(actual_scan)
-        matched_points = predicted_scan[indices.flatten()]
-        actual_mean = np.mean(actual_scan, axis=0)
-        matched_mean = np.mean(matched_points, axis=0)
-        H = (actual_scan - actual_mean).T @ (matched_points - matched_mean)
-        U, _, Vt = np.linalg.svd(H)
-        R_icp = U @ Vt
-        t_icp = matched_mean - R_icp @ actual_mean
-        actual_scan = actual_scan @ R_icp.T + t_icp
-        error = np.linalg.norm(distances)
-        if error < tolerance:
-            break
-    return R_icp, t_icp, error
-
-# === Visualization Helpers ===
-def plot_pose(pose, label, color, scale=0.5):
-    x, y, theta = pose
-    dx = scale * np.cos(theta)
-    dy = scale * np.sin(theta)
-    plt.arrow(x, y, dx, dy, color=color, head_width=0.3, length_includes_head=True, label=label)
-
-def visualize_icp(global_map, actual_scan, predicted_scan, corrected_scan, true_pose, estimated_pose, corrected_pose):
-    plt.figure(figsize=(12, 12))
+# Function to calculate curvature at each point of a 2D curve using second derivative
+def curvature(points):
+    x = points[:, 0]
+    y = points[:, 1]
     
-    # Global map
-    plt.plot(global_map[:, 0], global_map[:, 1], 'k-', label="Global Map")
+    dx = np.gradient(x)
+    dy = np.gradient(y)
+    ddx = np.gradient(dx)
+    ddy = np.gradient(dy)
+    
+    curv = (dx * ddy - dy * ddx) / (dx**2 + dy**2)**1.5
+    return curv
 
-    # Robot poses
-    plot_pose(true_pose, "True Pose", "green")
-    plot_pose(estimated_pose, "Initial Estimated Pose", "blue")
-    plot_pose(corrected_pose, "Corrected Pose (ICP)", "red")
+# Function to align two curves based on curvature matching
+def curvature_matching_error(params, curve1, curve2):
+    dx, dy, dtheta = params
+    R = np.array([[np.cos(dtheta), -np.sin(dtheta)], [np.sin(dtheta), np.cos(dtheta)]])
+    
+    # Apply rotation and translation to the second curve
+    transformed_curve2 = (curve2 @ R.T) + np.array([dx, dy])
+    
+    # Compute curvatures of both curves
+    curv1 = curvature(curve1)
+    curv2 = curvature(transformed_curve2)
+    
+    # Minimize the difference in curvatures
+    error = np.sum((curv1 - curv2) ** 2)
+    return error
 
-    # Scans
-    plt.scatter(actual_scan[:, 0], actual_scan[:, 1], label="Actual Scan (LiDAR)", color="orange", alpha=0.7)
-    plt.scatter(predicted_scan[:, 0], predicted_scan[:, 1], label="Predicted Scan (From Pose)", color="purple", alpha=0.7)
-    plt.scatter(corrected_scan[:, 0], corrected_scan[:, 1], label="Corrected Scan (ICP Aligned)", color="cyan", alpha=0.7)
+# Define two curves (a sine curve and a rotated/shifted sine curve)
+x = np.linspace(0, 10, 100)
+y1 = np.sin(x)
+curve1 = np.vstack([x, y1]).T
 
-    # Formatting
-    plt.title("ICP Scan Matching Visualization")
-    plt.xlabel("x (meters)")
-    plt.ylabel("y (meters)")
-    plt.legend(loc="upper left")
-    plt.axis("equal")
-    plt.grid()
+# Create a transformed version of curve1 (shifted and rotated)
+theta = np.radians(30)  # Rotation angle
+translation = np.array([1, 0.5])
+R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+curve2 = (curve1 @ R.T) + translation
 
-# === Main Simulation ===
-def main():
-    global_map = generate_map()
-    true_pose = np.array([5.0, 3.0, np.pi / 6])
-    estimated_pose = np.array([5.2, 3.1, np.pi / 6 + 0.1])
-    actual_scan = simulate_lidar(true_pose, global_map)
-    predicted_scan = simulate_lidar(estimated_pose, global_map, noise_std=0)
-    R_icp, t_icp, error = icp(actual_scan, predicted_scan)
-    corrected_scan = actual_scan @ R_icp.T + t_icp
-    corrected_pose = estimated_pose + np.array([t_icp[0], t_icp[1], np.arctan2(R_icp[1, 0], R_icp[0, 0])])
-    print("True Pose:", true_pose)
-    print("Initial Estimated Pose:", estimated_pose)
-    print("Corrected Pose (after ICP):", corrected_pose)
-    print("Alignment Error:", error)
-    visualize_icp(global_map, actual_scan, predicted_scan, corrected_scan, true_pose, estimated_pose, corrected_pose)
-    plt.show()
+# Optimize the alignment (translation + rotation)
+initial_guess = [0, 0, 0]  # Initial guess for dx, dy, dtheta
+result = minimize(curvature_matching_error, initial_guess, args=(curve1, curve2), method="BFGS")
+dx_opt, dy_opt, dtheta_opt = result.x
 
-# Run the simulation
-main()
+# Apply the optimal transformation
+R_opt = np.array([[np.cos(dtheta_opt), -np.sin(dtheta_opt)], [np.sin(dtheta_opt), np.cos(dtheta_opt)]])
+aligned_curve2 = (curve2 @ R_opt.T) + np.array([dx_opt, dy_opt])
+
+# Plot the original and aligned curves
+plt.plot(curve1[:, 0], curve1[:, 1], 'b-', label="Original Curve")
+
+plt.plot(aligned_curve2[:, 0], aligned_curve2[:, 1], 'g-', label="Aligned Curve (After Matching)")
+plt.plot(curve2[:, 0], curve2[:, 1], 'r--', label="Transformed Curve (Before Matching)")
+plt.legend()
+plt.show()

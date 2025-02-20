@@ -111,11 +111,11 @@ class SplineDataAssociation:
                     # distance_test = np.sqrt((points_obs[0] - points_map[0])**2 + (points_obs[1] - points_map[1])**2)
                     # print("Distance2:", distance_test)
                     
-                    print("Distance:", distance)
-                    print("u_ini:", u_ini)
-                    print("t_ini:", t_ini)
-                    print("u_fin:", u_fin)
-                    print("t_fin:", t_fin)
+                    # print("Distance:", distance)
+                    # print("u_ini:", u_ini)
+                    # print("t_ini:", t_ini)
+                    # print("u_fin:", u_fin)
+                    # print("t_fin:", t_fin)
 
                     Matched = False
                     if distance < d_match and (t_fin > t_ini) and (u_fin > u_ini):
@@ -134,49 +134,49 @@ class SplineDataAssociation:
                         # print("t_fin:", t_fin)
                         
                         
-                        # Plot the splines for comparison
-                        plt.figure(figsize=(10, 8))
-                        # Plot map splines and control points
-                        u = np.linspace(0, 1, 100)
-                        x, y = splev(u, map_tck)
-                        plt.plot(x, y, label="Map Spline", color="blue")
-                        map_cp = np.vstack(map_tck[1]).T
-                        plt.scatter(map_cp[:, 0], map_cp[:, 1], color="blue", marker='o', label="Map Control Points")
+                        # # Plot the splines for comparison
+                        # plt.figure(figsize=(10, 8))
+                        # # Plot map splines and control points
+                        # u = np.linspace(0, 1, 100)
+                        # x, y = splev(u, map_tck)
+                        # plt.plot(x, y, label="Map Spline", color="blue")
+                        # map_cp = np.vstack(map_tck[1]).T
+                        # plt.scatter(map_cp[:, 0], map_cp[:, 1], color="blue", marker='o', label="Map Control Points")
                         
-                        # Plot observed splines and control points
-                        u = np.linspace(0, 1, 100)
-                        x, y = splev(u, obs_tck)
-                        plt.plot(x, y, label="Observed Spline", color="green")
-                        obs_cp = np.vstack(obs_tck[1]).T
-                        plt.scatter(obs_cp[:, 0], obs_cp[:, 1], color="green", marker='x', label="Obs Control Points")
+                        # # Plot observed splines and control points
+                        # u = np.linspace(0, 1, 100)
+                        # x, y = splev(u, obs_tck)
+                        # plt.plot(x, y, label="Observed Spline", color="green")
+                        # obs_cp = np.vstack(obs_tck[1]).T
+                        # plt.scatter(obs_cp[:, 0], obs_cp[:, 1], color="green", marker='x', label="Obs Control Points")
                         
-                        # Plot points
-                        x_obs, y_obs = splev(u_ini, obs_tck)
-                        plt.scatter(x_obs, y_obs, color="red", marker='o', label="Initial Observed Point")
-                        x_map, y_map = splev(t_ini, map_tck)
-                        plt.scatter(x_map, y_map, color="red", marker='x', label="Initial Map Point")
+                        # # Plot points
+                        # x_obs, y_obs = splev(u_ini, obs_tck)
+                        # plt.scatter(x_obs, y_obs, color="red", marker='o', label="Initial Observed Point")
+                        # x_map, y_map = splev(t_ini, map_tck)
+                        # plt.scatter(x_map, y_map, color="red", marker='x', label="Initial Map Point")
                         
-                        # Plot points
-                        x_obs, y_obs = splev(u_fin, obs_tck)
-                        plt.scatter(x_obs, y_obs, color="black", marker='o', label="Final Observed Point")
-                        x_map, y_map = splev(t_fin, map_tck)
-                        plt.scatter(x_map, y_map, color="black", marker='x', label="Final Map Point")
+                        # # Plot points
+                        # x_obs, y_obs = splev(u_fin, obs_tck)
+                        # plt.scatter(x_obs, y_obs, color="black", marker='o', label="Final Observed Point")
+                        # x_map, y_map = splev(t_fin, map_tck)
+                        # plt.scatter(x_map, y_map, color="black", marker='x', label="Final Map Point")
                         
-                        test_point = t_ini +0.15
-                        print("t_ini:", test_point)  
-                        test_point = x_test, y_test = splev(test_point, map_tck)
-                        plt.scatter(x_test, y_test, color="orange", marker='o', label="Test Point")
+                        # test_point = t_ini +0.15
+                        # print("t_ini:", test_point)  
+                        # test_point = x_test, y_test = splev(test_point, map_tck)
+                        # plt.scatter(x_test, y_test, color="orange", marker='o', label="Test Point")
                         
                         
                             
                         
-                        plt.legend()
-                        plt.xlabel("X")
-                        plt.ylabel("Y")
-                        plt.title("Spline Data Association with Control Points")
-                        plt.grid()
-                        plt.axis('equal')
-                        plt.show()
+                        # plt.legend()
+                        # plt.xlabel("X")
+                        # plt.ylabel("Y")
+                        # plt.title("Spline Data Association with Control Points")
+                        # plt.grid()
+                        # plt.axis('equal')
+                        # plt.show()
         
                     
                 associations.append((obs_tck, map_tck))

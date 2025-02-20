@@ -27,16 +27,18 @@ sys.path.append(script_dir)
 
 # EKF state covariance
 M = np.diag([0.5, 0.5, np.deg2rad(30.0)]) ** 2
-M = np.diag([0.5]) 
+M = np.diag([0.01])  ** 2
 
 # EKF measurement covariance of a single lidar beam
 R = np.diag([0.1, np.deg2rad(1.0)]) ** 2
+Q = np.diag([0.1]) ** 2
 
 STATE_SIZE = 3  # State size [x, y, yaw]
 LM_SIZE = 2  # Landmark size [x, y]
 
 predictor = SplineLaserPredictor()
 data_associator = SplineDataAssociation()
+map_visualiser = SplineMapVisualiser()
 
 class EKF_SLAM(Node):  # MODIFY NAME
     def __init__(self):
@@ -208,14 +210,18 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             
             current_landmark_id, new_landmark= search_correspond_LM_ID(xEst, entry, feature_size_vector) # Checks for data association
             # Extend feature if necessary
+            # new_landmark = True
             
             if new_landmark is True:
                 print("New LM")
                 current_landmark_id = len(feature_size_vector) #Number of landmark +1
                 x_coordinates, y_coordinates, feature_data_size = calc_landmark_positions(xEst, entry)
                 feature_size_vector.append(feature_data_size)
+                
+                # print(f"Pest: {PEst}")
                
                 PAug = calc_augmented_covariance(xEst, PEst, entry) # Need to fix R
+                # print(f"PAug: {PAug}")
                 xAug = np.hstack((xEst, x_coordinates, y_coordinates))
                 xEst = xAug
                 PEst = PAug
@@ -223,10 +229,19 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             #Predict measurement
             z_bar_list, tau_p_list, t_star_list, spline_tangents_list = predict_measurement(xEst, entry, feature_size_vector, current_landmark_id)
             # Remove the front and back values
-            z_bar_list = z_bar_list[1:-1]  
-            tau_p_list = tau_p_list[1:-1]
-            t_star_list = t_star_list[1:-1]
-            spline_tangents_list = spline_tangents_list[1:-1]
+            z_bar_list[0] = z_bar_list[1]
+            z_bar_list[-1] = z_bar_list[-2]
+            tau_p_list[0] = tau_p_list[1]
+            tau_p_list[-1] = tau_p_list[-2]
+            t_star_list[0] = t_star_list[1]
+            t_star_list[-1] = t_star_list[-2]
+            spline_tangents_list[0] = spline_tangents_list[1]
+            spline_tangents_list[-1] = spline_tangents_list[-2]
+        
+            # z_bar_list = z_bar_list[1:-1]  
+            # tau_p_list = tau_p_list[1:-1]
+            # t_star_list = t_star_list[1:-1]
+            # spline_tangents_list = spline_tangents_list[1:-1]
             
             H = calculate_measurement_jacobian(z_bar_list, tau_p_list, t_star_list, spline_tangents_list, feature_size_vector, current_landmark_id)
             # print(f"H shape: {H.shape}")
@@ -234,32 +249,51 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             
             # # Extract range
             ranges = range_bearing_data[:, 0]
-            ranges = ranges[1:-1]
+            # ranges = ranges[1:-1]
             y = ranges - z_bar_list 
-            print(f"Ranges: {ranges}")
+            # print(f"Ranges: {ranges}")
             # print(f"Ranges shape: {ranges.shape}")
-            print(f"Z_bar: {z_bar_list}")
+            # print(f"Z_bar: {z_bar_list}")
             # print(f"Z_bar shape: {z_bar_list.shape}")
-            print(f"y: {y}")
-            print(f"y shape: {y.shape}")
+            # print(f"y: {y}")
+            # print(f"y shape: {y.shape}")
       
-            S = H @ PEst @ H.T # + R_new
+            # print(f"Pest: {PEst}")
+            S = H @ PEst @ H.T
+            size = S.shape[1]
+            C = np.diag([0.01] * size)
+            # print(f"C: {C}")
+            S = S + C
+            # print(f"S: {S}")
+            # print(f"S shape: {S.shape}")
+            
+           
+            
             K = (PEst @ H.T) @ np.linalg.inv(S)
-            print(f"K: {K}")
-            print(f"K shape: {K.shape}")
+            # print(f"K: {K}")
+            # print(f"K shape: {K.shape}")
             
-            print(f'xEst: {xEst}')
-            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-            visualiser.plot_splines()
+            # print(f'xEst: {xEst}')
+            # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            # visualiser.plot_splines()
             
-            print(f"K@y: {K @ y}")
+            
+            
+            # print(f"K@y: {K @ y}")
+            # print(f'PEst: {PEst}')
             xEst = xEst + (K @ y)
-            
-            print(f'xEst: {xEst}')
-            visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-            visualiser.plot_splines()
-            
             PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
+            
+            # print(f'xEst: {xEst}')
+            # print(f'PEst: {PEst}')
+            #Print the diag of the covariance matrix
+            # print(f"PEst diag: {np.diag(PEst)}")
+            # visualiser = SplineMapVisualiser(xEst, feature_size_vector, PEst)
+            # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+            # visualiser.plot_splines()
+            map_visualiser.update_plot(xEst, feature_size_vector)
+            
+           
             
             
           
@@ -283,8 +317,8 @@ def EKF_SLAM_step(xEst, PEst, u, z, feature_size_vector, landmark_id):
             # self.get_logger().info(f'Matrix ID: {matrix_id} is a placeholder.')
             print(f"Matrix ID: {matrix_id} is a placeholder.")
             
-    visualiser = SplineMapVisualiser(xEst, feature_size_vector)
-    visualiser.plot_splines()
+    # visualiser = SplineMapVisualiser(xEst, feature_size_vector)
+    # visualiser.plot_splines()
 
     return xEst, PEst
     
@@ -552,6 +586,7 @@ def calc_augmented_covariance(xEst, PEst, entry):
     size = G_z.shape[1]
     M = np.diag([0.5] * size)
     
+    # print(f"G_x: {G_x}")
     # print(f"G_x shape: {G_x.shape}")
     # print(f"PEst shape: {PEst.shape}")
     # print(f"G_z shape: {G_z.shape}")
@@ -559,8 +594,12 @@ def calc_augmented_covariance(xEst, PEst, entry):
     
     First = G_x @ PEst @ G_x.T
     Second = G_z @ M @ G_z.T
-    PAug = First #+ Second
+    PAug = First + Second
     # PAug = G_x @ PEst @ G_x.T + G_z @ M @ G_z.T
+    # print(f"First: {First}")
+    # print(f"Second: {Second}")
+    # print(f"PAug: {PAug}")
+    
     # print(f"First shape: {First.shape}")
     # print(f"Second shape: {Second.shape}")
     # print(f"PAug shape: {PAug.shape}")
@@ -590,7 +629,7 @@ def predict_measurement(xEst, entry, feature_size_vector, landmark_id):
     #Visualise imformation
     # print("f.tau_p_list", tau_p_list)
     # print(f"Predicted measurements: {z}")
-    predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T, range_bearing_data[:, 0])
+    # predictor.visualize_lidar_beams(tau_p_list, pose, control_points.T, range_bearing_data[:, 0])
     
     return z, tau_p_list, t_stars, tangent_angles
 

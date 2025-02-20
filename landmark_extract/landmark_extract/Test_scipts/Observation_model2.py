@@ -45,31 +45,31 @@ class SplineLaserPredictor:
 
         return np.array(transformed_points)
 
-    @staticmethod
-    def bernstein_basis(n, i, t):
-        """Compute the Bernstein basis polynomial of degree n."""
-        return comb(n, i) * (1 - t)**(n - i) * t**i
+    # @staticmethod
+    # def bernstein_basis(n, i, t):
+    #     """Compute the Bernstein basis polynomial of degree n."""
+    #     return comb(n, i) * (1 - t)**(n - i) * t**i
 
-    @staticmethod
-    def bernstein_derivative(n, i, t):
-        """Compute the derivative of the Bernstein basis polynomial."""
-        if i > 0:
-            return comb(n, i) * (i * t**(i - 1) * (1 - t)**(n - i) - (n - i) * t**i * (1 - t)**(n - i - 1))
-        else:
-            return -n * (1 - t)**(n - 1)
+    # @staticmethod
+    # def bernstein_derivative(n, i, t):
+    #     """Compute the derivative of the Bernstein basis polynomial."""
+    #     if i > 0:
+    #         return comb(n, i) * (i * t**(i - 1) * (1 - t)**(n - i) - (n - i) * t**i * (1 - t)**(n - i - 1))
+    #     else:
+    #         return -n * (1 - t)**(n - 1)
 
-    @staticmethod
-    def spline_function(control_points, t):
-        """Evaluate a cubic Bézier curve for parameter t."""
-        n = len(control_points) - 1  # Degree of the spline
-        point = np.zeros(2)  # To store the evaluated point
-        for i in range(n + 1):
-            bernstein = SplineLaserPredictor.bernstein_basis(n, i, t)
-            point += bernstein * control_points[i]
-        return point
+    # @staticmethod
+    # def spline_function(control_points, t):
+    #     """Evaluate a cubic Bézier curve for parameter t."""
+    #     n = len(control_points) - 1  # Degree of the spline
+    #     point = np.zeros(2)  # To store the evaluated point
+    #     for i in range(n + 1):
+    #         bernstein = SplineLaserPredictor.bernstein_basis(n, i, t)
+    #         point += bernstein * control_points[i]
+    #     return point
 
-    @staticmethod
-    def spline_derivative(control_points, t):
+    # @staticmethod
+    # def spline_derivative(control_points, t):
         """Evaluate the derivative of a cubic Bézier curve at parameter t."""
         n = len(control_points) - 1  # Degree of the spline
         derivative = np.zeros(2)
@@ -114,6 +114,7 @@ class SplineLaserPredictor:
         # derivative = self.spline_derivative(self.control_points, t_star)
         derivative = self.bspline_derivative(self.control_points, t_star)
         tangent_angle = np.arctan2(derivative[1], derivative[0])  # atan2(dy, dx)
+        # return tangent_angle
         return (np.pi-(-tangent_angle))
 
     def predict_measurement(self):
