@@ -25,7 +25,19 @@ class ScanToScanMatching(Node):
             self.prev_transform = self.prev_transform @ transformation
             # self.get_logger().info(f'Transformation:\n{self.prev_transform}')
             formatted_matrix = np.array2string(self.prev_transform, formatter={'float_kind': lambda x: f"{x:.2f}"})
-            self.get_logger().info(f'Transformation:\n{formatted_matrix}')
+            # self.get_logger().info(f'Transformation:\n{formatted_matrix}')
+            
+            # Extract the pose (translation and rotation) from the transformation matrix
+            translation = self.prev_transform[:3, 3]
+            rotation_matrix = self.prev_transform[:3, :3]
+            rotation = self.get_euler_angles_from_rotation_matrix(rotation_matrix)
+
+            # Format translation and rotation values to two decimal places
+            translation_str = ', '.join(f'{t:.2f}' for t in translation)
+            rotation_str = ', '.join(f'{r:.2f}' for r in rotation)
+
+            self.get_logger().info(f'Pose:\nTranslation: [{translation_str}]\nRotation (radians): [{rotation_str}]')
+            
         self.prev_pcd = current_pcd
 
     def ros_to_open3d(self, ros_msg):
@@ -34,13 +46,37 @@ class ScanToScanMatching(Node):
         fmt = "fff"  # XYZ format
         for i in range(0, len(ros_msg.data), ros_msg.point_step):
             x, y, z = struct.unpack_from(fmt, ros_msg.data, offset=i)
-            points.append([x, y, z])
+            points.append([-x, y, z]) #Open 3D uses a slightly diffeent coordinate system, so we invert the x-axis to match ROS 2
 
         # Create Open3D point cloud
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
         return pcd
 
+    def get_euler_angles_from_rotation_matrix(self, rotation_matrix):
+        """
+        Extracts Euler angles (roll, pitch, yaw) from a 3x3 rotation matrix.
+        
+        Args:
+            rotation_matrix (numpy.ndarray): 3x3 rotation matrix.
+        
+        Returns:
+            tuple: (roll, pitch, yaw) in radians.
+        """
+        sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
+
+        singular = sy < 1e-6  # If true, we are in a singularity
+
+        if not singular:
+            roll = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
+            pitch = np.arctan2(-rotation_matrix[2, 0], sy)
+            yaw = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+        else:
+            roll = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
+            pitch = np.arctan2(-rotation_matrix[2, 0], sy)
+            yaw = 0  # Yaw is undefined in this case
+
+        return roll, pitch, yaw
     def match_scans(self, source, target):
         source_down = source.voxel_down_sample(voxel_size=0.05)
         target_down = target.voxel_down_sample(voxel_size=0.05)

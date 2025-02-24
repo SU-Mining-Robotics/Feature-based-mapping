@@ -4,17 +4,23 @@ from scipy.interpolate import splprep, splev
 from scipy import interpolate
 
 class BSplineFitter:
-    def __init__(self, lidar_segments):
+    def __init__(self):
         """
         Initialize the BSplineFitter with a list of lidar segments.
         Each segment should be a list of points (numpy arrays of shape (N, 2)).
         """
-        self.lidar_segments = lidar_segments
+        self.lidar_segments = []
         self.bspline_curves = []
         self.knot_points = []
         self.control_points = []
         self.spline_order = []
         self.centroids = []
+        
+    def set_lidar_segments(self, lidar_segments):
+        self.lidar_segments = lidar_segments
+        
+    def get_bspline_data(self):
+        return  self.bspline_curves, self.knot_points, self.control_points, self.centroids
 
     def fit_bspline_to_lidar(self, lidar_segment, smoothness=0):
         """

@@ -30,6 +30,7 @@ setup(
             "Path_odom = landmark_extract.Path_test_odom:main",
             "Scan_process = landmark_extract.Lidar_scan_processing:main",
             "EKF_SLAM = landmark_extract.EKF_SLAM_NODE:main",
+            "Feature_scan_SLAM = landmark_extract.Feature_scan_SLAM:main",
         ],
     },
 )

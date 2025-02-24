@@ -27,17 +27,16 @@ sys.path.append(script_dir)
 
 
 # from Bezierfit import BezierCurveFitter
-from Bezierfit_V2 import BezierCurveFitter
+# from Bezierfit_V2 import BezierCurveFitter
 # from BSplinefit import BSplineFitter
-# from BSpline_V2 import BSplineFitter
 from BSplinefit_V3 import BSplineFitter
 from scipy.interpolate import interpolate
   
 class myNode(Node):
 	def __init__(self):
 		super().__init__("Lidar_proccesing_node")  
-		self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
-		# self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
+		# self.laserscan_sub = self.create_subscription(LaserScan, "/a200_1057/sensors/lidar2d_0/scan", self.scan_callback, 10) # For Husky robot
+		self.laserscan_sub = self.create_subscription(LaserScan, "/scan", self.scan_callback, 10) # For F1tenth car or simulation
   
   		# Publisher for visualization
 		self.segment_publisher = self.create_publisher(MarkerArray, "/scan_segments", 10)
@@ -103,10 +102,10 @@ class myNode(Node):
 		# # bezier_fitter.visualize()
 		# bezier_fitter.visualize_continues()
 
-		# bspline_fitter = BSplineFitter(scan_segments)
-		# bspline_curves_list, knot_points_list, control_points_list, centroids_list, tck_list = bspline_fitter.fit_all_segments(0.5)
-		# ## bspline_fitter.visualize()
-		# bspline_fitter.visualize_continues()
+		# # bspline_fitter = BSplineFitter(scan_segments)
+		# self.bspline_fitter.set_lidar_segments(scan_segments)
+		# self.bspline_fitter.fit_all_segments(smoothness=0)
+		# self.bspline_fitter.visualize_continues()
 
         #V2
 		# self.bspline_fitter.feed_lidar_segments(scan_segments)
@@ -114,13 +113,11 @@ class myNode(Node):
 		# self.bspline_fitter.visualize_continues()
 		# self.publish_spline_data(tck_list)
   
-		# #V3
+		#V3
 		self.bspline_fitter.feed_lidar_segments(scan_segments)
 		self.bspline_fitter.fit_all_segments(knot_spacing=0.5)
-		# self.bspline_fitter.calculate_knot_segment_lengths()
-		# self.bspline_fitter.visualize()
 		self.curve_length_list, self.knots_list, self.control_points_list, self.spline_list, self.Collocation_Matrix_list, self.B_pseudoinverse_list, self.reversed_control_points_list, self.r_spline_list = self.bspline_fitter.send_results()
-		# self.bspline_fitter.visualize_continues()
+		self.bspline_fitter.visualize_continues()
 		# self.bspline_fitter.fit_bspline_to_lidar(self.scan_segments[3], knot_distance=0.5)
 		# self.bspline_fitter.plot_bspline()
   
@@ -143,7 +140,7 @@ class myNode(Node):
 		# # Visualisation
 		# # self.visualise_scan_features(self.lenghts, self.angles)
 		# self.plot_segments(scan_segments)	
-		self.plot_segments_continous()
+		# self.plot_segments_continous()
   
 	def publish_all_matrices(self, matrix_list):
 		matrices_data = []

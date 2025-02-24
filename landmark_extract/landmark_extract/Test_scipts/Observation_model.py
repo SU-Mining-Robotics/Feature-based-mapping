@@ -2,7 +2,6 @@ import numpy as np
 from scipy.optimize import newton
 import matplotlib.pyplot as plt
 from scipy.special import comb
-from scipy.interpolate import BSpline
 
 class SplineLaserPredictor:
     def __init__(self, control_points=None, laser_angle=0.0, robot_pose=None):
@@ -82,7 +81,7 @@ class SplineLaserPredictor:
         """Compute the tangent angle at t_star."""
         derivative = self.spline_derivative(self.control_points, t_star)
         tangent_angle = np.arctan2(derivative[1], derivative[0])  # atan2(dy, dx)
-        return (np.pi-(-tangent_angle))
+        return tangent_angle
 
     def predict_measurement(self):
         """Predict the laser measurement for a single laser beam."""
@@ -93,17 +92,17 @@ class SplineLaserPredictor:
             return self.spline_function(transformed_points, t)[1]
 
         # initial_guesses = np.linspace(0, 1, 10)  # Initial guesses for t
-        t_initial = 0.5
-        try:
-            t_star = newton(sy_root, t_initial)  # Newton-Raphson to find the root
-            # t_star =0.73
-            if 0 <= t_star <= 1:
-                predicted_distance = self.spline_function(transformed_points, t_star)[0]
-                tangent_angle = self.compute_tangent_angle(t_star)  # Tangent angle at t_star
-                # tangent_angle = 0.0
-                return predicted_distance, t_star, tangent_angle, transformed_points
-        except RuntimeError:
-            return 0.0, 0, 0.0, transformed_points
+        initial_guesses = np.array([0.1, 0.5])
+        for t_initial in initial_guesses:
+            try:
+                t_star = newton(sy_root, t_initial)  # Newton-Raphson to find the root
+                if 0 <= t_star <= 1:
+                    predicted_distance = self.spline_function(transformed_points, t_star)[0]
+                    tangent_angle = self.compute_tangent_angle(t_star)  # Tangent angle at t_star
+                    return predicted_distance, t_star, tangent_angle, transformed_points
+            except RuntimeError:
+                continue
+        return 0.0, 0, 0.0, transformed_points
     
     def predict_distances(self, angles, robot_pose, control_points):
         """
@@ -118,8 +117,6 @@ class SplineLaserPredictor:
             np.ndarray: Array of predicted distances for each angle.
         """
         distances = []
-        t_stars = []
-        tangent_angles = []
 
         for angle in angles:
             # Update the robot pose and control points for this calculation
@@ -135,27 +132,22 @@ class SplineLaserPredictor:
                 return self.spline_function(transformed_points, t)[1]
 
             # Try multiple initial guesses for t
-            initial_guesses = np.linspace(0.5, 1, 10)  # Customize the range and number of guesses
+            initial_guesses = np.linspace(0, 1, 10)  # Customize the range and number of guesses
             predicted_distance = 0.0  # Default value if no solution is found
-            tangent_angle = 0.0
-            t_star = 0.0
             for t_initial in initial_guesses:
                 try:
                     t_star = newton(sy_root, t_initial)  # Use Newton-Raphson to find the root
                     # Ensure t_star is within the valid range [0, 1]
                     if 0 <= t_star <= 1:
                         predicted_distance = self.spline_function(transformed_points, t_star)[0]
-                        tangent_angle = self.compute_tangent_angle(t_star)  # Tangent angle at t_star
                         break
                 except RuntimeError:
                     continue  # Try the next initial guess
 
             # Append the result for this angle
             distances.append(predicted_distance)
-            t_stars.append(t_star)
-            tangent_angles.append(tangent_angle)
 
-        return np.array(distances), np.array(t_stars), np.array(tangent_angles)
+        return np.array(distances)
 
 
 
@@ -165,13 +157,6 @@ class SplineLaserPredictor:
         print(f"Predicted Distance: {predicted_distance:.2f} m")
         print(f"t_star: {t_star:.2f}")
         print(f"Tangent Angle: {np.degrees(tangent_angle):.2f} degrees")
-        
-        
-       
-        degree = 3  # Degree of the spline
-        knots = np.linspace(0, 1, len(self.control_points) + degree + 1)  # Knot vector
-        reversed_control_points = self.control_points[::-1]  # Reverse the control points
-        r_spline = BSpline(knots, reversed_control_points, degree)
 
         t_values = np.linspace(0, 1, 100)
         original_spline_points = np.array([self.spline_function(self.control_points, t) for t in t_values])
@@ -206,7 +191,6 @@ class SplineLaserPredictor:
         plt.plot([tangent_start[0], tangent_end[0]], [tangent_start[1], tangent_end[1]], 
                 label="Tangent Line", color="purple", linestyle="-")
         plt.scatter(test_intersection_point[0], test_intersection_point[1], label="Test Intersection Point", color="yellow")  
-        plt.plot(r_spline(t_values)[:, 0], r_spline(t_values)[:, 1], label="Reversed Spline", color="green", linestyle="--")
         plt.title("Original Spline and Laser Beam in Global Frame")
         plt.xlabel("x (global frame)")
         plt.ylabel("y (global frame)")
@@ -230,7 +214,7 @@ class SplineLaserPredictor:
 
         plt.show()
         
-    def visualize_lidar_beams(self, angles, robot_pose, control_points, actual_distances):
+    def visualize_lidar_beams(self, angles, robot_pose, control_points):
         """
         Visualize the spline and lidar beams.
         
@@ -238,10 +222,9 @@ class SplineLaserPredictor:
             angles (array-like): List or array of angles for the laser beams.
             robot_pose (array-like): The pose of the robot [x, y, theta].
             control_points (array-like): Control points of the spline curve.
-            actual_distances (array-like): Actual distances measured by the lidar.
         """
         # Predict distances for all angles
-        distances, t_stars, tangent_angles = self.predict_distances(angles, robot_pose, control_points)
+        distances = self.predict_distances(angles, robot_pose, control_points)
 
         # Generate the original spline points
         t_values = np.linspace(0, 1, 100)
@@ -253,21 +236,12 @@ class SplineLaserPredictor:
         plt.scatter(control_points[:, 0], control_points[:, 1], color="green", label="Control Points")
 
         # Plot each lidar beam
-        for angle, predicted_distance, actual_distance in zip(angles, distances, actual_distances):
+        for angle, distance in zip(angles, distances):
             laser_origin = np.array([robot_pose[0], robot_pose[1]])
             laser_direction = np.array([np.cos(angle + robot_pose[2]), np.sin(angle + robot_pose[2])])
-            
-            # Actual beam
-            actual_end = laser_origin + actual_distance * laser_direction
-            plt.plot([laser_origin[0], actual_end[0]], [laser_origin[1], actual_end[1]], 
-                     color="red", linestyle="-", linewidth=2, alpha=0.7, marker='o', label="Actual Beam" if angle == angles[0] else "")
-            
-            # Predicted beam
-            predicted_end = laser_origin + predicted_distance * laser_direction
-            plt.plot([laser_origin[0], predicted_end[0]], [laser_origin[1], predicted_end[1]], 
-                     color="orange", linestyle="-", alpha=0.5, marker='x', label="Predicted Beam" if angle == angles[0] else "")
-
-
+            laser_end = laser_origin + distance * laser_direction
+            plt.plot([laser_origin[0], laser_end[0]], [laser_origin[1], laser_end[1]], 
+                    color="orange", linestyle="--", alpha=0.7)
 
         plt.title("Original Spline and Lidar Beams")
         plt.xlabel("x (global frame)")
@@ -286,8 +260,8 @@ def main(args=None):
     
     robot_pose = np.array([0.0, 0.0, 0.0])  # Robot pose [x, y, theta]
     laser_angle = -2.7405292607843876  # Laser beam angle (in radians)
-    # laser_angle = 2.7405292607843876  # Laser beam angle (in radians)
-    # laser_angle = 3.5405292607843876- 2 * np.pi  # Laser beam angle (in radians)
+    laser_angle = 2.7405292607843876  # Laser beam angle (in radians)
+    laser_angle = 3.5405292607843876- 2 * np.pi  # Laser beam angle (in radians)
     # laser_angle = -3.1405292607843876  # behaves wierd
     # laser_angle = -3.8405292607843876  #Still acceptable
     # laser_angle = -2.7405292607843876  # Wierd
@@ -305,10 +279,7 @@ def main(args=None):
         [-2.1909611,  -1.9891872]
     ])
 
-    predictor = SplineLaserPredictor()
-    predictor.set_control_points(control_points)
-    predictor.set_laser_angle(laser_angle)
-    predictor.set_robot_pose(robot_pose)
+    predictor = SplineLaserPredictor(control_points, laser_angle, robot_pose)
     predictor.visualize_prediction()
 
 if __name__ == "__main__":

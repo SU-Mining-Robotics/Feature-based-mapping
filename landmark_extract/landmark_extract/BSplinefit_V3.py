@@ -287,7 +287,7 @@ class BSplineFitter:
             plt.plot(spline_points[:, 0], spline_points[:, 1], color="red", label="Fitted B-spline")
 
             # Plot control points
-            plt.scatter(control_points[:, 0], control_points[:, 1], color="green", s=50, label="Control Points")
+            # plt.scatter(control_points[:, 0], control_points[:, 1], color="green", s=50, label="Control Points")
             
             # Plot knots
             knot_positions = spline(knots[self.degree:-self.degree])  # Interior knots
@@ -295,11 +295,11 @@ class BSplineFitter:
             
             # Plot reversed B-spline and control points
             plt.plot(r_spline(t)[:, 0], r_spline(t)[:, 1], color="purple", label="Reversed B-spline")
-            plt.scatter(reversed_control_points[:, 0], reversed_control_points[:, 1], color="black", s=30, label="Reversed Control Points")
+            # plt.scatter(reversed_control_points[:, 0], reversed_control_points[:, 1], color="black", s=30, label="Reversed Control Points")
             
             # Plot reversed knots
             reversed_knot_positions = r_spline(knots[self.degree:-self.degree])
-            # plt.scatter(reversed_knot_positions[:, 0], reversed_knot_positions[:, 1], color="yellow", s=20, label="Reversed Knots", zorder=5)
+            plt.scatter(reversed_knot_positions[:, 0], reversed_knot_positions[:, 1], color="yellow", s=20, label="Reversed Knots", zorder=5)
         
         # Customize plot appearance
         plt.title('B-Spline Curves Fitted to Lidar Segments with Control Point Centroids')

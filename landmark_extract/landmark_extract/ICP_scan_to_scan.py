@@ -60,35 +60,35 @@ class ICPScanToScan:
 
         return R, T
 
-    def fit(self, prev_scan, curr_scan, initial_pose):
+    def icp_scanmatching(self, target, source, initial_pose):
         """
-        Performs ICP to align the current scan to the previous scan.
+        Performs ICP to align the source point cloud to the target point cloud.
 
         Args:
-            prev_scan (ndarray): Point cloud from the previous scan, shape (N, 2).
-            curr_scan (ndarray): Point cloud from the current scan, shape (M, 2).
+            target (ndarray): Reference point cloud (N, 2).
+            source (ndarray): Point cloud to be aligned (M, 2).
             initial_pose (ndarray): Initial guess for the transformation (3x3 matrix).
 
         Returns:
-            R (ndarray): Final rotation matrix (2x2).
-            T (ndarray): Final translation vector (2x1).
-            transformed_scan (ndarray): Transformed current scan after alignment.
+            H_final (ndarray): Final total transformation matrix (3x3).
+            H_correction (ndarray): Correction transformation from initial to final pose (3x3).
+            transformed_source (ndarray): Transformed source point cloud after alignment.
         """
         # Initialize transformation
         H = initial_pose  # Start with initial guess (3x3)
-        curr_scan_homo = np.hstack((curr_scan, np.ones((curr_scan.shape[0], 1))))  # Homogeneous coords
+        source_homo = np.hstack((source, np.ones((source.shape[0], 1))))  # Homogeneous coords
 
         prev_error = float('inf')
 
         for iteration in range(self.max_iterations):
-            # Transform the current scan using the current transformation
-            transformed_scan = (H @ curr_scan_homo.T).T[:, :2]
+            # Transform the source using the current transformation
+            transformed_source = (H @ source_homo.T).T[:, :2]
 
-            # Find correspondences between transformed scan and previous scan
-            matched_points, distances = self.nearest_neighbor_association(transformed_scan, prev_scan)
+            # Find correspondences between transformed source and target
+            matched_points, distances = self.nearest_neighbor_association(transformed_source, target)
 
             # Compute new transformation using matched points
-            R, T = self.svd_motion_estimation(transformed_scan, matched_points)
+            R, T = self.svd_motion_estimation(transformed_source, matched_points)
 
             # Update the total transformation
             H_update = np.eye(3)
@@ -104,22 +104,91 @@ class ICPScanToScan:
 
             # Visualize the process
             if self.visualize:
-                self._visualize_iteration(prev_scan, transformed_scan, iteration)
+                self._visualize_iteration(target, transformed_source, iteration)
 
-        # Extract final R and T from H
-        R_final = H[:2, :2]
-        T_final = H[:2, 2]
+        # Compute the correction transformation
+        # print("Initial pose matrix:\n", initial_pose)
+        # print("Determinant:", np.linalg.det(initial_pose))
+        H_correction = H @ np.linalg.inv(initial_pose)
+        # print("Correction matrix:\n", H_correction)
+        # print("Determinant:", np.linalg.det(H_correction))
+        
 
-        # Final transformed scan
-        transformed_scan = (H @ curr_scan_homo.T).T[:, :2]
+        # Final transformed source
+        transformed_source = (H @ source_homo.T).T[:, :2]
 
         # Final visualization
         if self.visualize:
-            self._visualize_final(prev_scan, transformed_scan)
+            self._visualize_final(target, transformed_source)
 
-        # return R_final, T_final, transformed_scan
-        return H
+        return H, H_correction, transformed_source
 
+    def icp_scanmatching_map(self, target, source, initial_pose):
+        """
+        Performs ICP to align the source point cloud to the target point cloud.
+
+        Args:
+            target (ndarray): Reference point cloud (N, 2).
+            source (ndarray): Point cloud to be aligned (M, 2).
+            initial_pose (ndarray): Initial guess for the transformation (3x3 matrix).
+
+        Returns:
+            H_final (ndarray): Final total transformation matrix (3x3).
+            H_correction (ndarray): Correction transformation from initial to final pose (3x3).
+            transformed_source (ndarray): Transformed source point cloud after alignment.
+            final_error (float): Mean squared error of the final alignment.
+        """
+        # Initialize transformation
+        H = initial_pose  # Start with initial guess (3x3)
+        source_homo = np.hstack((source, np.ones((source.shape[0], 1))))  # Homogeneous coords
+
+        prev_error = float('inf')
+
+        for iteration in range(self.max_iterations):
+            # Transform the source using the current transformation
+            transformed_source = (H @ source_homo.T).T[:, :2]
+
+            # Find correspondences between transformed source and target
+            matched_points, distances = self.nearest_neighbor_association(transformed_source, target)
+
+            # Compute new transformation using matched points
+            R, T = self.svd_motion_estimation(transformed_source, matched_points)
+
+            # Update the total transformation
+            H_update = np.eye(3)
+            H_update[:2, :2] = R
+            H_update[:2, 2] = T
+            H = H_update @ H
+
+            # Check for convergence (change in error)
+            mean_error = np.mean(distances)
+            if np.abs(prev_error - mean_error) < self.tolerance:
+                break
+            prev_error = mean_error
+
+            # Visualize the process
+            if self.visualize:
+                self._visualize_iteration(target, transformed_source, iteration)
+
+        # Compute the correction transformation
+        H_correction = H @ np.linalg.inv(initial_pose)
+        # print("Correction matrix:\n", H_correction)
+        # print("Determinant:", np.linalg.det(H_correction))
+
+        # Final transformed source
+        transformed_source = (H @ source_homo.T).T[:, :2]
+
+        # Compute final mean squared error
+        _, final_distances = self.nearest_neighbor_association(transformed_source, target)
+        final_error = np.mean(final_distances)  # Mean squared error
+
+        # Final visualization
+        if self.visualize:
+            self._visualize_final(target, transformed_source)
+
+        return H, H_correction, transformed_source, final_error
+
+    
     def _visualize_iteration(self, prev_scan, transformed_scan, iteration):
         """Visualizes the alignment process for each iteration."""
         plt.figure(figsize=(8, 6))
